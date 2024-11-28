@@ -208,11 +208,6 @@ const exportConnectionDialog = async (id) => {
  * Opens a dialog popup to manage stored connection information.
  */
 const connectionManagerDialog = async () => {
-    if (Object.keys(connections).length === 0) {
-        console.log('Connections not loaded yet, waiting...');
-        await initializeConnections();
-    }
-
     const popup = new PopupBuilder();
     const el = document.createElement('div');
     el.id = 'connectionManager';
@@ -498,12 +493,14 @@ const addNewConnectionDialog = async () => {
  * @param {string} path An initial directory path to override the saved one
  */
 const setActiveConnection = (id, path) => {
+    console.log("Setting active connection", id);
     if (!connections[id]) {
         throw new Error(`Connection with ID ${id} not found!`);
     }
     backPaths = [];
     forwardPaths = [];
     activeConnection = JSON.parse(JSON.stringify(connections[id]));
+    console.log("Active connection", activeConnection);
     activeConnectionId = id;
     selectionClipboard = [];
     changePath(path, false);
@@ -2556,8 +2553,14 @@ window.addEventListener('load', async () => {
         const registration = await navigator.serviceWorker.register('/worker.js');
         console.log('Service Worker registered with scope:', registration.scope);
     }
+    if (Object.keys(connections).length === 0) {
+        console.log('Connections not loaded yet, waiting...');
+        await initializeConnections();
+    }
+
     const params = new URLSearchParams(window.location.search);
     const connection = connections[params.get('con') || '0'];
+    console.log(`Connection:`, connection, params.get('con'), params.get('path'));
     if (connection) {
         setActiveConnection(params.get('con'), params.get('path'));
     } else {
