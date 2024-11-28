@@ -93,8 +93,15 @@ let isSearching = false;
 /**
  * Saves the current state of the `connections` object to LocalStorage.
  */
-const saveConnections = () => {
-    window.localStorage.setItem('connections', JSON.stringify(connections));
+const saveConnections = async () => {
+    await fetch('/api/sftp/connections/edit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(connections)
+    });
+    console.log("new connections saved", connections);
 }
 
 /**
@@ -108,6 +115,7 @@ const getSortedConnectionsArray = () => {
             id: id,
             ...connection
         });
+        console.log("Treated", connection);
     }
     connectionValues.sort((a, b) => {
         const aName = a.name.toLowerCase();
@@ -185,6 +193,7 @@ const connectionManagerDialog = () => {
     el.id = 'connectionManager';
     el.classList = 'col gap-15';
     const connectionValues = getSortedConnectionsArray();
+    console.log("connectionValues", connectionValues);
     for (const connection of connectionValues) {
         const entry = document.createElement('div');
         entry.classList = 'entry row gap-10 align-center';
@@ -231,7 +240,7 @@ const connectionManagerDialog = () => {
                     .setIsDanger(true)
                     .setClickHandler(async () => {
                         delete connections[connection.id];
-                        saveConnections();
+                        await saveConnections();
                         entry.remove();
                     }))
                 .showAtCursor();
@@ -276,7 +285,7 @@ const connectionManagerDialog = () => {
                     const data = JSON.parse(reader.result);
                     const id = Date.now();
                     connections[id] = data;
-                    saveConnections();
+                    await saveConnections();
                     if (!data.key && !data.password) {
                         return editConnectionDialog(id);
                     }

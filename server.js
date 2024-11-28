@@ -163,22 +163,16 @@ const initApi = asyncHandler(async (req, res, next) => {
 
 // MY CHANGES
 
-const MY_CONNECTION_OBJECTS = {
-    "1234567": {
-        "name": "My Connection",
-        "host": "sftp.example.com",
-    },
-
-}
+let connection_objects = {}
 
 srv.get('/api/sftp/connections', async (req, res) => {
-    res.json(MY_CONNECTION_OBJECTS)
+    res.json(connection_objects)
 });
 
 srv.post('/api/sftp/connections/edit', rawBodyParser, async (req, res) => {
     const data = JSON.parse(req.body);
-    MY_CONNECTION_OBJECTS.connections = data.connections;
-    res.json(MY_CONNECTION_OBJECTS);
+    connection_objects = data;
+    res.json(connection_objects);
 });
 
 /** Stores the association between the generated keys and the corresponding requests */
@@ -1029,5 +1023,5 @@ if (Electron.app) {
         });
     });
 } else {
-    srv.listen(config.port, () => console.log(`Standalone server listening on port ${config.port}`));
+    srv.listen(config.port, () => console.log(`Standalone server listening on http://localhost:${config.port}`));
 }
