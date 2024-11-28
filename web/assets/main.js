@@ -324,18 +324,3 @@ const downloadFile = async path => {
     }
 }
 
-const initializeConnections = async () => {
-    try {
-        const response = await fetch('/api/sftp/connections');
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-        connections = await response.json();
-        console.log('Connections loaded:', connections);
-    } catch (error) {
-        console.error('Failed to load connections:', error);
-        connections = {};
-    }
-};
-
-initializeConnections();

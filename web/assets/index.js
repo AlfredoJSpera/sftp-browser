@@ -90,6 +90,24 @@ let keypressClearTimeout;
 let searchWebsocket;
 let isSearching = false;
 
+
+const initializeConnections = async () => {
+    try {
+        console.log('Loading connections...');
+        const response = await fetch('/api/sftp/connections');
+        console.log("Finished fetch");
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        connections = await response.json();
+        console.log('Connections loaded:', connections);
+    } catch (error) {
+        console.error('Failed to load connections:', error);
+        connections = {};
+    }
+};
+
+
 /**
  * Saves the current state of the `connections` object to LocalStorage.
  */
@@ -109,6 +127,7 @@ const saveConnections = async () => {
  */
 const getSortedConnectionsArray = () => {
     const connectionValues = [];
+    console.log("starting sort");
     for (const id of Object.keys(connections)) {
         const connection = connections[id];
         connectionValues.push({
@@ -124,6 +143,7 @@ const getSortedConnectionsArray = () => {
         if (aName > bName) return 1;
         return 0;
     });
+    console.log("connectionValues", connectionValues);
     return connectionValues;
 }
 
@@ -187,13 +207,18 @@ const exportConnectionDialog = async (id) => {
 /**
  * Opens a dialog popup to manage stored connection information.
  */
-const connectionManagerDialog = () => {
+const connectionManagerDialog = async () => {
+    if (Object.keys(connections).length === 0) {
+        console.log('Connections not loaded yet, waiting...');
+        await initializeConnections();
+    }
+
     const popup = new PopupBuilder();
     const el = document.createElement('div');
     el.id = 'connectionManager';
     el.classList = 'col gap-15';
     const connectionValues = getSortedConnectionsArray();
-    console.log("connectionValues", connectionValues);
+    console.log("connectionValues in manager", connectionValues);
     for (const connection of connectionValues) {
         const entry = document.createElement('div');
         entry.classList = 'entry row gap-10 align-center';
