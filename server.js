@@ -161,7 +161,10 @@ const initApi = asyncHandler(async (req, res, next) => {
     next();
 });
 
-// MY CHANGES
+//============================//
+//         MY CHANGES         //
+//============================//
+
 
 let connection_objects = {}
 
@@ -174,6 +177,11 @@ srv.post('/api/sftp/connections/edit', rawBodyParser, async (req, res) => {
     connection_objects = data;
     res.json(connection_objects);
 });
+
+//============================//
+//       END MY CHANGES       //
+//============================//
+
 
 /** Stores the association between the generated keys and the corresponding requests */
 const keyedRequests = {};

@@ -91,25 +91,40 @@ let searchWebsocket;
 let isSearching = false;
 
 
+//=========================//
+//        MY CHANGES       //
+//=========================//
+
+
+/**
+ * Initializes the `connections` object from the server.
+ */
 const initializeConnections = async () => {
     try {
-        console.log('Loading connections...');
+        console.log('[initializeConnections] Loading connections...');
         const response = await fetch('/api/sftp/connections');
-        console.log("Finished fetch");
+        console.log("[initializeConnections] Finished loading connections");
+
         if (!response.ok) {
             throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
+
         connections = await response.json();
-        console.log('Connections loaded:', connections);
+        console.log('[initializeConnections] Connections loaded:', connections);
     } catch (error) {
-        console.error('Failed to load connections:', error);
+        console.error('[initializeConnections] Failed to load connections:', error);
         connections = {};
     }
 };
 
+//============================//
+//       END MY CHANGES       //
+//============================//
+
+
 
 /**
- * Saves the current state of the `connections` object to LocalStorage.
+ * Saves the current state of the `connections` object to the server.
  */
 const saveConnections = async () => {
     await fetch('/api/sftp/connections/edit', {
@@ -119,7 +134,7 @@ const saveConnections = async () => {
         },
         body: JSON.stringify(connections)
     });
-    console.log("new connections saved", connections);
+    console.log("[saveConnections] New connections saved", connections);
 }
 
 /**
@@ -127,15 +142,17 @@ const saveConnections = async () => {
  */
 const getSortedConnectionsArray = () => {
     const connectionValues = [];
-    console.log("starting sort");
+    console.log("[getSortedConnectionsArray] Starting sort");
+
     for (const id of Object.keys(connections)) {
         const connection = connections[id];
         connectionValues.push({
             id: id,
             ...connection
         });
-        console.log("Treated", connection);
+        console.log("[getSortedConnectionsArray] Added to array:", id);
     }
+
     connectionValues.sort((a, b) => {
         const aName = a.name.toLowerCase();
         const bName = b.name.toLowerCase();
@@ -143,7 +160,7 @@ const getSortedConnectionsArray = () => {
         if (aName > bName) return 1;
         return 0;
     });
-    console.log("connectionValues", connectionValues);
+    console.log("[getSortedConnectionsArray] Final connection values", connectionValues);
     return connectionValues;
 }
 
@@ -213,7 +230,6 @@ const connectionManagerDialog = async () => {
     el.id = 'connectionManager';
     el.classList = 'col gap-15';
     const connectionValues = getSortedConnectionsArray();
-    console.log("connectionValues in manager", connectionValues);
     for (const connection of connectionValues) {
         const entry = document.createElement('div');
         entry.classList = 'entry row gap-10 align-center';
@@ -2553,14 +2569,20 @@ window.addEventListener('load', async () => {
         const registration = await navigator.serviceWorker.register('/worker.js');
         console.log('Service Worker registered with scope:', registration.scope);
     }
+
+    // MY CHANGES
     if (Object.keys(connections).length === 0) {
         console.log('Connections not loaded yet, waiting...');
         await initializeConnections();
     }
+    // END MY CHANGES
 
     const params = new URLSearchParams(window.location.search);
     const connection = connections[params.get('con') || '0'];
-    console.log(`Connection:`, connection, params.get('con'), params.get('path'));
+
+    console.log(`Connection:`, connection,)
+    console.log("Params passed (con, path):", params.get('con'), params.get('path'));
+
     if (connection) {
         setActiveConnection(params.get('con'), params.get('path'));
     } else {
