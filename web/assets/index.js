@@ -150,7 +150,7 @@ const getSortedConnectionsArray = () => {
             id: id,
             ...connection
         });
-        console.log("[getSortedConnectionsArray] Added to array:", id);
+        console.log("[getSortedConnectionsArray] Added to array to sort:", id);
     }
 
     connectionValues.sort((a, b) => {
@@ -160,7 +160,7 @@ const getSortedConnectionsArray = () => {
         if (aName > bName) return 1;
         return 0;
     });
-    console.log("[getSortedConnectionsArray] Final connection values", connectionValues);
+    console.log("[getSortedConnectionsArray] Sorted connection values", connectionValues);
     return connectionValues;
 }
 
@@ -2578,9 +2578,10 @@ window.addEventListener('load', async () => {
     // END MY CHANGES
 
     const params = new URLSearchParams(window.location.search);
-    const connection = connections[params.get('con') || '0'];
+    const idToFind = params.get('con') || '0'
+    const connection = connections[idToFind];
 
-    console.log(`Connection:`, connection,)
+    console.log(`Connection found with ${idToFind}:`, connection)
     console.log("Params passed (con, path):", params.get('con'), params.get('path'));
 
     if (connection) {

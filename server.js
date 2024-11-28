@@ -984,7 +984,7 @@ setInterval(() => {
         const lastActive = sessionActivity[hash];
         if (!lastActive) continue;
         if ((Date.now() - lastActive) > 1000 * 60 * 5) {
-            console.log(`Deleting inactive session`);
+            console.log(`Deleting inactive sftp session`);
             sessions[hash].end();
             delete sessions[hash];
             delete sessionActivity[hash];
