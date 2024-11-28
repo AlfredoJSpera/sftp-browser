@@ -161,6 +161,26 @@ const initApi = asyncHandler(async (req, res, next) => {
     next();
 });
 
+// MY CHANGES
+
+const MY_CONNECTION_OBJECTS = {
+    "1234567": {
+        "name": "My Connection",
+        "host": "sftp.example.com",
+    },
+
+}
+
+srv.get('/api/sftp/connections', async (req, res) => {
+    res.json(MY_CONNECTION_OBJECTS)
+});
+
+srv.post('/api/sftp/connections/edit', rawBodyParser, async (req, res) => {
+    const data = JSON.parse(req.body);
+    MY_CONNECTION_OBJECTS.connections = data.connections;
+    res.json(MY_CONNECTION_OBJECTS);
+});
+
 /** Stores the association between the generated keys and the corresponding requests */
 const keyedRequests = {};
 

@@ -11,7 +11,7 @@ let isLocalhost = window.location.hostname == 'localhost';
 let httpProtocol = isLocalhost ? 'http' : 'https';
 let wsProtocol = httpProtocol == 'http' ? 'ws' : 'wss';
 /** An object of saved connection information */
-let connections = JSON.parse(window.localStorage.getItem('connections')) || {};
+let connections = {};
 /** The current active connection */
 let activeConnection = null;
 /** The ID of the current active connection */
@@ -27,10 +27,10 @@ function checkDoElementsOverlap(el1, el2) {
     const rect1 = el1.getBoundingClientRect();
     const rect2 = el2.getBoundingClientRect();
 
-    const overlap = !(rect1.right < rect2.left || 
-                    rect1.left > rect2.right || 
-                    rect1.bottom < rect2.top || 
-                    rect1.top > rect2.bottom);
+    const overlap = !(rect1.right < rect2.left ||
+        rect1.left > rect2.right ||
+        rect1.bottom < rect2.top ||
+        rect1.top > rect2.bottom);
 
     return overlap;
 }
@@ -166,11 +166,11 @@ const getFileExtInfo = (path, size) => {
         markdown: 'gfm'
     };
     const maxSizes = {
-        image: 1024*1024*16,
-        video: 1024*1024*16,
-        audio: 1024*1024*16,
-        text: 1024*1024*2,
-        markdown: 1024*1024*2
+        image: 1024 * 1024 * 16,
+        video: 1024 * 1024 * 16,
+        audio: 1024 * 1024 * 16,
+        text: 1024 * 1024 * 2,
+        markdown: 1024 * 1024 * 2
     };
     const data = { isViewable: false, type: null, mime: null };
     if (!path.match(/\./g)) {
@@ -232,7 +232,7 @@ const api = {
      * @param {callback|undefined} onProgress A callback function that gets passed an Axios progress event
      * @returns {object} An object representing the response data or error info
      */
-    request: async (method, url, params, body = null, onProgress = () => {}, responseType = 'json') => {
+    request: async (method, url, params, body = null, onProgress = () => { }, responseType = 'json') => {
         url = `${httpProtocol}://${apiHost}/api/sftp/${url}`;
         try {
             const opts = {
@@ -323,3 +323,20 @@ const downloadFile = async path => {
         setStatus(`Single file download started`);
     }
 }
+
+const initializeConnections = async () => {
+    try {
+        const response = await fetch('/api/sftp/connections');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        connections = await response.json();
+        console.log('Connections loaded:', connections);
+    } catch (error) {
+        console.error('Failed to load connections:', error);
+        // Usa un valore di default se il caricamento fallisce
+        connections = {};
+    }
+};
+
+initializeConnections();
