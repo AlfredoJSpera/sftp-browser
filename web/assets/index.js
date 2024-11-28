@@ -1,3 +1,6 @@
+//============================//
+//       HTML ELEMENTS        //
+//============================//
 
 const btnConnections = $('#connections');
 const btnNavBack = $('#navBack');
@@ -30,6 +33,11 @@ const inputSearch = $('#inputNavSearch');
 const btnSearchCancel = $('#navSearchCancel');
 const btnSearchGo = $('#navSearchGo');
 const forceTileViewWidth = 720;
+
+//============================//
+//         VARIABLES          //
+//============================//
+
 /** An array of paths in the back history */
 let backPaths = [];
 /** An array of paths in the forward history */
@@ -73,9 +81,11 @@ let fileAccessLock = false;
 */
 let showDownloadPopup = window.localStorage.getItem('showDownloadPopup');
 showDownloadPopup = (showDownloadPopup == null) ? true : (showDownloadPopup === 'true');
+
 // Variables for file name navigation
 let keypressString = '';
 let keypressClearTimeout;
+
 // Variables for recursive searching
 let searchWebsocket;
 let isSearching = false;
@@ -203,7 +213,7 @@ const connectionManagerDialog = () => {
                 .addItem(option => option
                     .setLabel('Edit...')
                     .setIcon('edit')
-                    .setClickHandler(async() => {
+                    .setClickHandler(async () => {
                         popup.hide();
                         await editConnectionDialog(connection.id);
                         connectionManagerDialog();
@@ -211,7 +221,7 @@ const connectionManagerDialog = () => {
                 .addItem(option => option
                     .setLabel('Export...')
                     .setIcon('download')
-                    .setClickHandler(async() => {
+                    .setClickHandler(async () => {
                         exportConnectionDialog(connection.id);
                     }))
                 .addSeparator()
@@ -219,7 +229,7 @@ const connectionManagerDialog = () => {
                     .setLabel('Delete')
                     .setIcon('delete')
                     .setIsDanger(true)
-                    .setClickHandler(async() => {
+                    .setClickHandler(async () => {
                         delete connections[connection.id];
                         saveConnections();
                         entry.remove();
@@ -240,7 +250,7 @@ const connectionManagerDialog = () => {
         <div class="icon">add</div>
         New connection...
     `;
-    btnAdd.addEventListener('click', async() => {
+    btnAdd.addEventListener('click', async () => {
         popup.hide();
         await addNewConnectionDialog();
         connectionManagerDialog();
@@ -252,16 +262,16 @@ const connectionManagerDialog = () => {
         <div class="icon">cloud_upload</div>
         Import...
     `;
-    btnImport.addEventListener('click', async() => {
+    btnImport.addEventListener('click', async () => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json';
-        input.addEventListener('change', async() => {
+        input.addEventListener('change', async () => {
             const file = input.files[0];
             if (!file) return;
             popup.hide();
             const reader = new FileReader();
-            reader.addEventListener('load', async() => {
+            reader.addEventListener('load', async () => {
                 try {
                     const data = JSON.parse(reader.result);
                     const id = Date.now();
@@ -431,7 +441,7 @@ const editConnectionDialog = async (id) => new Promise(resolve => {
 /**
  * Adds a new connection with basic placeholder data and runs `editConnectionDialog()` on it.
  */
-const addNewConnectionDialog = async() => {
+const addNewConnectionDialog = async () => {
     const id = Date.now();
     connections[id] = {
         name: 'New Connection',
@@ -470,7 +480,7 @@ const setActiveConnection = (id, path) => {
  * @param {string} path The target path
  * @param {boolean} pushState If `true`, update the back/forward history
  */
-const changePath = async(path, pushState = true) => {
+const changePath = async (path, pushState = true) => {
     loadStartTime = Date.now();
     if (!activeConnection) return;
     // Lock file selection to prevent double-clicking during load
@@ -487,7 +497,7 @@ const changePath = async(path, pushState = true) => {
     // If there was an error
     if (dataStats.error) {
         setStatus(`Error: ${dataStats.error}`, true);
-    // Otherwise...
+        // Otherwise...
     } else {
         // Get extension info
         const info = getFileExtInfo(dataStats.path.split('/').pop(), dataStats.stats.size);
@@ -501,7 +511,7 @@ const changePath = async(path, pushState = true) => {
             }
             // Update the path bar
             inputNavPath.value = activeConnection.path;
-        // If the path is a directory
+            // If the path is a directory
         } else if (dataStats.stats.isDirectory) {
             // Update the path bar
             inputNavPath.value = dataStats.path;
@@ -515,7 +525,7 @@ const changePath = async(path, pushState = true) => {
             window.history.replaceState(null, null, `?con=${activeConnectionId}&path=${encodeURIComponent(activeConnection.path)}`);
             // Load the directory
             await loadDirectory(dataStats.path);
-        // Otherwise, show an error
+            // Otherwise, show an error
         } else {
             setStatus(`Error: Path is not a file or directory`, true);
         }
@@ -559,7 +569,7 @@ const loadDirectory = async path => {
     btnDirSort.disabled = true;
     inputSearch.value = '';
     isSearching = false;
-    try { searchWebsocket.close(); } catch (error) {}
+    try { searchWebsocket.close(); } catch (error) { }
     // Get the directory listing
     setStatus(`Loading directory...`);
     const data = await api.get('directories/list', { path: path });
@@ -605,11 +615,11 @@ const loadDirectory = async path => {
         btnDirSort.disabled = false;
         inputSearch.placeholder = `Search within ${path.split('/').pop() || '/'}...`;
         updateDirControls();
-        setStatus(`Loaded directory with ${list.length} items in ${Date.now()-loadStartTime}ms`);
+        setStatus(`Loaded directory with ${list.length} items in ${Date.now() - loadStartTime}ms`);
     }
 }
 
-const searchDirectory = async(path, query) => {
+const searchDirectory = async (path, query) => {
     let startTime = Date.now();
     isSearching = true;
     setStatus(`Starting search...`);
@@ -633,7 +643,7 @@ const searchDirectory = async(path, query) => {
     const resSocketKey = await api.get('key');
     const key = resSocketKey.key;
     // Connect to the search websocket
-    try { searchWebsocket.close(); } catch (error) {}
+    try { searchWebsocket.close(); } catch (error) { }
     searchWebsocket = new WebSocket(`wss://${window.location.host}/api/sftp/directories/search?key=${key}&path=${encodeURIComponent(path)}&query=${encodeURIComponent(query)}`);
     let count = 0;
     let maxCount = 500;
@@ -679,7 +689,7 @@ const searchDirectory = async(path, query) => {
         }
     });
     searchWebsocket.addEventListener('close', () => {
-        setStatus(`Found ${count >= maxCount ? `${maxCount}+` : count} file(s) in ${Date.now()-startTime}ms`);
+        setStatus(`Found ${count >= maxCount ? `${maxCount}+` : count} file(s) in ${Date.now() - startTime}ms`);
     });
 }
 
@@ -727,9 +737,9 @@ const getFileEntryElement = (file, dirPath) => {
         <div class="icon flex-no-shrink">${icon}</div>
         <div class="nameCont col flex-grow">
             <div class="name"><span title="${file.name}">${file.name}</span></div>
-            ${lower.length > 0 ? /*html*/`<div class="lower">${lower.join(' • ')}</div>`:''}
+            ${lower.length > 0 ? /*html*/`<div class="lower">${lower.join(' • ')}</div>` : ''}
         </div>
-        <div class="date flex-no-shrink" ${dateAbsolute ? `title="${dateAbsolute}"`:''}>${dateRelative}</div>
+        <div class="date flex-no-shrink" ${dateAbsolute ? `title="${dateAbsolute}"` : ''}>${dateRelative}</div>
         <div class="size flex-no-shrink">${sizeFormatted}</div>
         <div class="perms flex-no-shrink" title="${permsNum}">${perms}</div>
     `;
@@ -747,7 +757,7 @@ const getFileEntryElement = (file, dirPath) => {
         // If the control key isn't held
         if (!e.ctrlKey) {
             // If this is a double-click
-            if ((Date.now()-lastClick) < 300) {
+            if ((Date.now() - lastClick) < 300) {
                 accessFile();
             }
         }
@@ -817,8 +827,8 @@ const getFileEntryElement = (file, dirPath) => {
         // Put all files before this one at the end of the array
         // This causes the search to wrap around to the beginning
         const filesWrapped = [
-            ...files.slice(parseInt(elFile.dataset.index)+1),
-            ...files.slice(0, parseInt(elFile.dataset.index)+1)
+            ...files.slice(parseInt(elFile.dataset.index) + 1),
+            ...files.slice(0, parseInt(elFile.dataset.index) + 1)
         ];
         // Search through file elements and select the first one
         // whose data-name starts with the keypress string
@@ -850,7 +860,7 @@ const getFileEntryElement = (file, dirPath) => {
         fileListScrollTopOnStart = elFiles.scrollTop;
         if (!checkIsSelecting()) {
             initialSelectTimeout = setTimeout(() => {
-                if ((Date.now()-timeTouchStart) > 1000) return;
+                if ((Date.now() - timeTouchStart) > 1000) return;
                 selectFile(elFile.dataset.path, true, false);
                 if (navigator.vibrate) navigator.vibrate(2);
             }, 400);
@@ -860,7 +870,7 @@ const getFileEntryElement = (file, dirPath) => {
     elFile.addEventListener('touchend', e => {
         if (!getIsMobileDevice()) return;
         clearTimeout(initialSelectTimeout);
-        if ((Date.now()-timeTouchStart) > 380) return;
+        if ((Date.now() - timeTouchStart) > 380) return;
         if (elFiles.scrollTop != fileListScrollTopOnStart) return;
         if (checkIsSelecting()) {
             selectFile(elFile.dataset.path, false, true);
@@ -894,7 +904,7 @@ const fileContextMenu = (elDisplay = null) => {
     const isSomeSelected = selectedFiles.length > 0;
     const isSingleSelected = selectedFiles.length == 1;
     const isMultiSelected = selectedFiles.length > 1;
-    const isAllSelected = selectedFiles.length == allVisibleFiles.length-1;
+    const isAllSelected = selectedFiles.length == allVisibleFiles.length - 1;
     // Build the menu
     const menu = new ContextMenuBuilder();
     if (isNoneSelected) menu.addItem(item => {
@@ -1015,7 +1025,7 @@ const fileContextMenu = (elDisplay = null) => {
         .setClickHandler(invertFileSelection))
     if (elDisplay) {
         const rect = elDisplay.getBoundingClientRect();
-        menu.showAtCoords(rect.left, rect.bottom-5);
+        menu.showAtCoords(rect.left, rect.bottom - 5);
     } else {
         menu.showAtCursor();
     }
@@ -1116,7 +1126,7 @@ const toggleHiddenFileVisibility = () => {
 const openFileViewer = path => {
     const url = `/file.html?con=${activeConnectionId}&path=${encodeURIComponent(path)}`;
     const isStandalone =
-           window.matchMedia('(display-mode: standalone)').matches
+        window.matchMedia('(display-mode: standalone)').matches
         || window.matchMedia('(display-mode: minimal-ui)').matches;
     if (!isStandalone) {
         // Open in new tab
@@ -1128,8 +1138,8 @@ const openFileViewer = path => {
         const viewerHeight = parseInt(window.localStorage.getItem('viewerHeight')) || window.innerHeight;
         const coords = {
             // Center the new window on top of this one
-            x: window.screenX + (window.innerWidth - viewerWidth)/2,
-            y: window.screenY + (window.innerHeight - viewerHeight)/2,
+            x: window.screenX + (window.innerWidth - viewerWidth) / 2,
+            y: window.screenY + (window.innerHeight - viewerHeight) / 2,
             w: viewerWidth,
             h: viewerHeight
         };
@@ -1145,9 +1155,9 @@ const openFileViewer = path => {
  * @param {string} rootPath The directory path to start at inside the zip file - leave undefined to use `'/'`
  * @returns {Promise<string|boolean>}
  */
-const getZipDownloadUrl = async(paths, rootPath = '/') => {
+const getZipDownloadUrl = async (paths, rootPath = '/') => {
     const pathsJson = JSON.stringify(paths);
-    if ((pathsJson.length+rootPath.length) > 1900) {
+    if ((pathsJson.length + rootPath.length) > 1900) {
         return setStatus(`Error: Too many selected paths for zip download`, true);
     }
     setStatus(`Getting zip file download URL...`);
@@ -1169,7 +1179,7 @@ const getZipDownloadUrl = async(paths, rootPath = '/') => {
  * @param {string[]} paths An array of file and/or directory paths
  * @param {string} [rootPath='/'] The directory path to start at inside the zip file
  */
-const downloadZip = async(paths, rootPath = '/') => {
+const downloadZip = async (paths, rootPath = '/') => {
     const url = await getZipDownloadUrl(paths, rootPath);
     if (url) {
         downloadUrl(url);
@@ -1198,7 +1208,7 @@ const updateDirControls = () => {
     // When no files are selected
     if (selectedFiles.length == 0) {
         btnDirMenu.classList.remove('info');
-    // When files are selected
+        // When files are selected
     } else {
         btnDirMenu.classList.add('info');
         // When a single file is selected
@@ -1328,7 +1338,7 @@ const createDirectoryDialog = () => {
         .addAction(action => action
             .setIsPrimary(true)
             .setLabel('Create')
-            .setClickHandler(async() => {
+            .setClickHandler(async () => {
                 const name = inputDirName.value;
                 if (!name) return;
                 const path = `${activeConnection.path}/${name}`;
@@ -1354,7 +1364,7 @@ const createDirectoryDialog = () => {
  * Opens a dialog prompting the user to rename the file with the specified path.
  * @param {string} path The file path
  */
-const renameFileDialog = async(path, shouldReload = true) => new Promise(resolve => {
+const renameFileDialog = async (path, shouldReload = true) => new Promise(resolve => {
     const el = document.createElement('div');
     const currentName = path.split('/').pop();
     el.innerHTML = /*html*/`
@@ -1369,8 +1379,8 @@ const renameFileDialog = async(path, shouldReload = true) => new Promise(resolve
         .addAction(action => action
             .setIsPrimary(true)
             .setLabel('Rename')
-            .setClickHandler(async() => {
-                popup.setOnHide(() => {});
+            .setClickHandler(async () => {
+                popup.setOnHide(() => { });
                 const name = input.value;
                 if (!name) return resolve(path);
                 const pathOld = path;
@@ -1416,7 +1426,7 @@ const renameFileDialog = async(path, shouldReload = true) => new Promise(resolve
  * @param {string} [actionLabel] The label of the confirm button
  * @returns {Promise<string|null>} A promise resolving to the selected directory path, or `null` if cancelled
  */
-const selectDirDialog = async(startPath = activeConnection.path, title = 'Select folder', actionLabel = 'Select') => new Promise(resolve => {
+const selectDirDialog = async (startPath = activeConnection.path, title = 'Select folder', actionLabel = 'Select') => new Promise(resolve => {
     const el = document.createElement('div');
     el.innerHTML = /*html*/`
         <div class="moveFilesPicker col gap-10" style="width: 500px; max-width: 100%">
@@ -1484,7 +1494,7 @@ const selectDirDialog = async(startPath = activeConnection.path, title = 'Select
  * @param {string[]} filePaths An array of file paths to move
  * @returns {Promise<string[]|null>} An array of new paths of the files successfully moved, or `null` if no files were moved
  */
-const moveFiles = async(newDirPath, filePaths) => {
+const moveFiles = async (newDirPath, filePaths) => {
     // Loop through selected files
     const newPaths = [];
     let i = 0;
@@ -1493,7 +1503,7 @@ const moveFiles = async(newDirPath, filePaths) => {
         const name = pathOld.split('/').pop();
         let pathNew = `${newDirPath}/${name}`;
         if (pathOld == pathNew) continue;
-        setStatus(`Moving file: ${pathOld}`, false, Math.round((i/filePaths.length)*100));
+        setStatus(`Moving file: ${pathOld}`, false, Math.round((i / filePaths.length) * 100));
         i++;
         // Check if the new path exists
         // If it does, prompt the user to replace it
@@ -1537,7 +1547,7 @@ const moveFiles = async(newDirPath, filePaths) => {
  * @param {string[]} filePaths An array of file paths to copy
  * @returns {Promise<string[]|null>} An array of new paths of the files successfully copied, or `null` if no files were copied
  */
-const copyFiles = async(newDirPath, filePaths) => {
+const copyFiles = async (newDirPath, filePaths) => {
     // Loop through selected files
     const newPaths = [];
     let i = 0;
@@ -1545,7 +1555,7 @@ const copyFiles = async(newDirPath, filePaths) => {
     for (const pathSource of filePaths) {
         const name = pathSource.split('/').pop();
         let pathDest = `${newDirPath}/${name}`;
-        setStatus(`Copying file: ${pathSource}`, false, Math.round((i/filePaths.length)*100));
+        setStatus(`Copying file: ${pathSource}`, false, Math.round((i / filePaths.length) * 100));
         i++;
         // Check if the new path exists
         // If it does, prompt the user to replace it
@@ -1586,10 +1596,10 @@ const copyFiles = async(newDirPath, filePaths) => {
  * @param {boolean} copy If `true`, copy the files instead of moving them
  * @returns {Promise<string[]|null>} An array of new file paths, or `null` if no files were transferred
  */
-const moveFilesDialog = async(copy = false) => {
+const moveFilesDialog = async (copy = false) => {
     const selectedPaths = [...getSelectedFiles()].map(el => el.dataset.path);
     // Prompt the user to select a directory
-    const newDirPath = await selectDirDialog(undefined, `${copy ? 'Copy':'Move'} ${selectedPaths.length > 1 ? `${selectedPaths.length} files`:'file'}`, `${copy ? 'Copy':'Move'} here`);
+    const newDirPath = await selectDirDialog(undefined, `${copy ? 'Copy' : 'Move'} ${selectedPaths.length > 1 ? `${selectedPaths.length} files` : 'file'}`, `${copy ? 'Copy' : 'Move'} here`);
     if (!newDirPath) return null;
     // Move or copy the files
     if (copy)
@@ -1648,7 +1658,7 @@ const checkFileExists = async path => {
  * @param {string} name The initial file name
  * @returns {Promise<string>} A promise resolving to the new file path
  */
-const getAvailableFileName = async(dir, name) => {
+const getAvailableFileName = async (dir, name) => {
     let i = 1;
     let path = `${dir}/${name}`;
     const nameWithoutExt = name.split('.').slice(0, -1).join('.');
@@ -1677,7 +1687,7 @@ const uploadFiles = async inputFiles => {
     // Handle status and progress bar
     let lastStatusSet = 0;
     const setUploadStatus = (text, progress = 0) => {
-        if ((Date.now()-lastStatusSet) < 500) return;
+        if ((Date.now() - lastStatusSet) < 500) return;
         setStatus(`<span><a href="#" class="text-danger" style="text-decoration: none">Cancel</a> | ${text}</span>`, false, progress);
         const anchor = $('a', elStatusBar);
         anchor.addEventListener('click', e => {
@@ -1716,7 +1726,7 @@ const uploadFiles = async inputFiles => {
             }
         }
         // Make a promise to upload the file
-        await new Promise(async(resolve, reject) => {
+        await new Promise(async (resolve, reject) => {
             let isUploadComplete = false;
             // Get socket key
             const resSocketKey = await api.get('key');
@@ -1745,7 +1755,7 @@ const uploadFiles = async inputFiles => {
             ws.addEventListener('message', e => {
                 const data = JSON.parse(e.data);
                 console.log(`Message from upload websocket:`, data);
-                if (!data.success)  {
+                if (!data.success) {
                     isUploading = false;
                     setStatus(`Error: ${data.error}`, true)
                     resolve('error');
@@ -1760,12 +1770,12 @@ const uploadFiles = async inputFiles => {
             console.log(`Opened websocket: ${url}`);
             // Upload the file in chunks
             const fileSize = file.size;
-            const bytesPerChunk = 1024*1024*1;
+            const bytesPerChunk = 1024 * 1024 * 1;
             const chunkCount = Math.ceil(file.size / bytesPerChunk);
             for (let i = 0; i < chunkCount; i++) {
                 if (isCancelled) break;
                 const startByte = i * bytesPerChunk;
-                const endByte = Math.min(file.size, (i+1) * bytesPerChunk);
+                const endByte = Math.min(file.size, (i + 1) * bytesPerChunk);
                 const thisChunkSize = endByte - startByte;
                 const chunk = file.slice(startByte, endByte);
                 // Upload the chunk
@@ -1778,9 +1788,9 @@ const uploadFiles = async inputFiles => {
                 if (!res) break;
                 // Update status with progress
                 totalBytesUploaded += thisChunkSize;
-                const bytesUploaded = Math.min((i+1)*bytesPerChunk, fileSize);
-                const bytesPerSecond = totalBytesUploaded / ((Date.now()-startTime)/1000);
-                const percentUploaded = Math.round((bytesUploaded/fileSize)*100);
+                const bytesUploaded = Math.min((i + 1) * bytesPerChunk, fileSize);
+                const bytesPerSecond = totalBytesUploaded / ((Date.now() - startTime) / 1000);
+                const percentUploaded = Math.round((bytesUploaded / fileSize) * 100);
                 setUploadStatus(`Uploading file: ${fileName} | ${formatSize(bytesUploaded)} of ${formatSize(fileSize)} (${formatSize(bytesPerSecond)}/s)`, percentUploaded);
             }
             isUploadComplete = true;
@@ -1823,7 +1833,7 @@ const uploadFiles = async inputFiles => {
 /**
  * Opens a system file picker and uploads the selected files to the active server.
  */
-const uploadFilesPrompt = async() => {
+const uploadFilesPrompt = async () => {
     // Prompt user to select files
     const input = document.createElement('input');
     input.type = 'file';
@@ -1841,7 +1851,7 @@ const uploadFilesPrompt = async() => {
  * @param {boolean} refresh If `true`, refresh the file list after deleting the file - defaults to `true`
  * @returns {Promise<Object>} The API response object
  */
-const deleteFile = async(path) => {
+const deleteFile = async (path) => {
     const data = await api.delete('files/delete', { path: path });
     if (data.error) {
         setStatus(`Error: ${data.error}`, true);
@@ -1858,7 +1868,7 @@ const deleteFile = async(path) => {
  * @param {boolean} refresh If `true`, refresh the file list after deleting the directory - defaults to `true`
  * @returns {Promise<Object>} The API response object
  */
-const deleteDirectory = async(path) => {
+const deleteDirectory = async (path) => {
     const data = await api.delete('directories/delete', { path: path });
     if (data.error) {
         setStatus(`Error: ${data.error}`, true);
@@ -1902,7 +1912,7 @@ const historyContextMenu = (e, btn, paths, menu = new ContextMenuBuilder()) => {
     menu.el.style.maxWidth = '100%';
     menu.setIconVisibility(false);
     const rect = btn.getBoundingClientRect();
-    menu.showAtCoords(rect.left, rect.bottom-5);
+    menu.showAtCoords(rect.left, rect.bottom - 5);
 }
 
 btnConnections.addEventListener('click', () => {
@@ -1933,7 +1943,7 @@ btnConnections.addEventListener('click', () => {
             window.open('https://github.com/CyberGen49/sftp-browser');
         }));
     const rect = btnConnections.getBoundingClientRect();
-    menu.showAtCoords(rect.left, rect.bottom-5);
+    menu.showAtCoords(rect.left, rect.bottom - 5);
 });
 
 btnNavBack.addEventListener('click', () => {
@@ -2017,7 +2027,7 @@ btnPathPopup.addEventListener('click', () => {
         }
     }
     const rect = btnPathPopup.getBoundingClientRect();
-    menu.showAtCoords(rect.right, rect.bottom-5);
+    menu.showAtCoords(rect.right, rect.bottom - 5);
 });
 
 btnDirMenu.addEventListener('click', () => {
@@ -2058,7 +2068,7 @@ btnSelectionCopy.addEventListener('click', () => {
     setStatus(`Copied ${selectionClipboard.length} file path(s) to selection clipboard`);
     updateDirControls();
 });
-btnSelectionPaste.addEventListener('click', async() => {
+btnSelectionPaste.addEventListener('click', async () => {
     const newDirPath = activeConnection.path;
     if (!newDirPath) return;
     // Move files
@@ -2069,7 +2079,7 @@ btnSelectionPaste.addEventListener('click', async() => {
         if (!newPaths) return;
         // Clear the clipboard
         selectionClipboard = [];
-    // Copy files
+        // Copy files
     } else {
         // Copy the files
         newPaths = await copyFiles(newDirPath, selectionClipboard);
@@ -2086,7 +2096,7 @@ btnSelectionPaste.addEventListener('click', async() => {
 btnSelectionMoveTo.addEventListener('click', () => moveFilesDialog(false));
 btnSelectionCopyTo.addEventListener('click', () => moveFilesDialog(true));
 
-btnFileCreate.addEventListener('click', async() => {
+btnFileCreate.addEventListener('click', async () => {
     let dir = activeConnection.path;
     let filePath = await getAvailableFileName(dir, 'file.txt');
     const data = await api.post('files/create', { path: filePath }, '');
@@ -2099,25 +2109,25 @@ btnFileCreate.addEventListener('click', async() => {
     selectFile(filePath, true, false, true);
 });
 
-btnSelectionDelete.addEventListener('click', async() => {
+btnSelectionDelete.addEventListener('click', async () => {
     const selected = [...getSelectedFiles()];
     const containsDirs = selected.some(el => el.dataset.type === 'd');
     new PopupBuilder()
-        .setTitle(`Delete ${selected.length == 1 ? 'file':`${selected.length} files`}`)
+        .setTitle(`Delete ${selected.length == 1 ? 'file' : `${selected.length} files`}`)
         .addBodyHTML(`
-            <p>Are you sure you want to delete ${selected.length == 1 ? `<b>${selected[0].dataset.name}</b>`:`these files`}?</p>
+            <p>Are you sure you want to delete ${selected.length == 1 ? `<b>${selected[0].dataset.name}</b>` : `these files`}?</p>
             ${containsDirs ? `<p class="text-danger">
-                ${selected.length == 1 ? 'This file is a directory':'Your selection contains directories'}! Deleting ${selected.length == 1 ? 'it':'them'} will also delete everything inside of ${selected.length == 1 ? 'it':'them'}.
-            </p>`:''}
+                ${selected.length == 1 ? 'This file is a directory' : 'Your selection contains directories'}! Deleting ${selected.length == 1 ? 'it' : 'them'} will also delete everything inside of ${selected.length == 1 ? 'it' : 'them'}.
+            </p>`: ''}
             <p>This usually can't be undone!</p>
         `)
         .addAction(action => action
             .setIsDanger(true)
             .setLabel('Delete')
-            .setClickHandler(async() => {
+            .setClickHandler(async () => {
                 let i = 0;
                 for (const el of selected) {
-                    setStatus(`Deleting file: ${el.dataset.path}`, false, Math.round((i/selected.length)*100));
+                    setStatus(`Deleting file: ${el.dataset.path}`, false, Math.round((i / selected.length) * 100));
                     let res = null;
                     if (el.dataset.type === 'd') {
                         res = await deleteDirectory(el.dataset.path);
@@ -2133,15 +2143,15 @@ btnSelectionDelete.addEventListener('click', async() => {
         .show();
 });
 
-btnSelectionPerms.addEventListener('click', async() => {
+btnSelectionPerms.addEventListener('click', async () => {
     const selected = [...getSelectedFiles()];
     // File permissions matrix
     // Columns are read, write, execute
     // Rows are owner, group, other
     let permsMatrix = [
-        [ 0, 0, 0 ],
-        [ 0, 0, 0 ],
-        [ 0, 0, 0 ]
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0]
     ];
     for (const el of selected) {
         const perms = el.dataset.perms.padEnd(10, '-').split('');
@@ -2205,7 +2215,7 @@ btnSelectionPerms.addEventListener('click', async() => {
         for (let ii = 0; ii < 3; ii++) {
             permsMatrix[i][ii] = Math.round(permsMatrix[i][ii] / selected.length);
             if (permsMatrix[i][ii] == 1) {
-                $(`input[data-row="${i+1}"][data-col="${ii+1}"]`, elMatrix).checked = true;
+                $(`input[data-row="${i + 1}"][data-col="${ii + 1}"]`, elMatrix).checked = true;
             }
         }
     }
@@ -2215,12 +2225,12 @@ btnSelectionPerms.addEventListener('click', async() => {
         .addAction(action => action
             .setIsPrimary(true)
             .setLabel('Save')
-            .setClickHandler(async() => {
+            .setClickHandler(async () => {
                 // Get permissions number
                 let str = '-';
                 for (let i = 0; i < 3; i++) {
                     for (let ii = 0; ii < 3; ii++) {
-                        const checkbox = $(`input[data-row="${i+1}"][data-col="${ii+1}"]`, elMatrix);
+                        const checkbox = $(`input[data-row="${i + 1}"][data-col="${ii + 1}"]`, elMatrix);
                         if (checkbox.checked) {
                             str += 'rwx'[ii];
                         } else {
@@ -2234,7 +2244,7 @@ btnSelectionPerms.addEventListener('click', async() => {
                 try {
                     let i = 0;
                     for (const file of selected) {
-                        setStatus(`Updating permissions for ${file.dataset.path}...`, false, Math.round((i/selected.length)*100));
+                        setStatus(`Updating permissions for ${file.dataset.path}...`, false, Math.round((i / selected.length) * 100));
                         const res = await api.put('files/chmod', {
                             path: file.dataset.path,
                             mode: perms
@@ -2263,25 +2273,25 @@ btnDownload.addEventListener('click', () => {
     const rootPath = activeConnection.path;
     if (selected.length == 1) {
         if (selected[0].dataset.type === 'd') {
-            downloadZip([ selected[0].dataset.path ], rootPath);
+            downloadZip([selected[0].dataset.path], rootPath);
         } else {
             downloadFile(selected[0].dataset.path);
         }
     } else if (selected.length > 1) {
         downloadZip(selected.map(el => el.dataset.path), rootPath);
     } else {
-        downloadZip([ activeConnection.path ], rootPath);
+        downloadZip([activeConnection.path], rootPath);
     }
 });
 
-btnShare.addEventListener('click', async() => {
+btnShare.addEventListener('click', async () => {
     new PopupBuilder()
         .setTitle('Copy download link')
         .addBodyHTML(`<p>This link will allow anyone to download your selected files and folders for the next 24 hours without the need for any credentials. Make sure you aren't sharing anything sensitive!</p>`)
         .addAction(action => action
             .setLabel('Copy')
             .setIsPrimary(true)
-            .setClickHandler(async() => {
+            .setClickHandler(async () => {
                 let url;
                 let selected = [...getSelectedFiles()];
                 const isNoneSelected = selected.length == 0;
@@ -2323,7 +2333,7 @@ btnDirView.addEventListener('click', () => {
         .setLabel('Show hidden files')
         .setClickHandler(() => toggleHiddenFileVisibility()));
     const rect = btnDirView.getBoundingClientRect();
-    menu.showAtCoords(rect.left, rect.bottom-5);
+    menu.showAtCoords(rect.left, rect.bottom - 5);
 });
 elFiles.classList.toggle('showHidden', showHidden);
 elFiles.classList.add(viewMode);
@@ -2353,7 +2363,7 @@ btnDirSort.addEventListener('click', () => {
         .setLabel('Descending')
         .setClickHandler(() => changeFileSortDirection(true)));
     const rect = btnDirSort.getBoundingClientRect();
-    menu.showAtCoords(rect.left, rect.bottom-5);
+    menu.showAtCoords(rect.left, rect.bottom - 5);
 });
 
 btnDirSelection.addEventListener('click', () => {
@@ -2374,7 +2384,7 @@ btnDirSelection.addEventListener('click', () => {
             .setTooltip('Ctrl + Alt + A')
             .setClickHandler(invertFileSelection));
     const rect = btnDirSelection.getBoundingClientRect();
-    menu.showAtCoords(rect.left, rect.bottom-5);
+    menu.showAtCoords(rect.left, rect.bottom - 5);
 });
 
 elFiles.addEventListener('dragover', e => {
@@ -2423,7 +2433,7 @@ btnSearchCancel.addEventListener('click', () => {
 });
 
 window.addEventListener('click', e => {
-    const matchIds = [ 'controls', 'files', 'filesFiles', 'filesFolders', 'fileColHeadings', 'statusBar' ];
+    const matchIds = ['controls', 'files', 'filesFiles', 'filesFolders', 'fileColHeadings', 'statusBar'];
     if (!matchIds.includes(e.target.id)) return;
     if (!e.ctrlKey) {
         if (getIsMobileDevice()) return;
@@ -2507,7 +2517,7 @@ window.addEventListener('resize', () => {
     }
 });
 
-window.addEventListener('load', async() => {
+window.addEventListener('load', async () => {
     if ('serviceWorker' in navigator) {
         const registration = await navigator.serviceWorker.register('/worker.js');
         console.log('Service Worker registered with scope:', registration.scope);
@@ -2537,4 +2547,4 @@ setInterval(() => {
             elDateMain.innerText = newText;
         });
     }
-}, 1000*60);
+}, 1000 * 60);
