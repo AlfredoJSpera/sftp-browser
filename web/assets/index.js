@@ -91,9 +91,9 @@ let searchWebsocket;
 let isSearching = false;
 
 
-//=========================//
-//        MY CHANGES       //
-//=========================//
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+//~~~~~~~~~MY CHANGES~~~~~~~~~//
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 
 /**
@@ -103,8 +103,7 @@ const initializeConnections = async () => {
     try {
         console.log('[initializeConnections] Loading connections...');
         const response = await fetch('/api/sftp/connections');
-        console.log("[initializeConnections] Finished loading connections");
-
+        
         if (!response.ok) {
             throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
@@ -117,9 +116,9 @@ const initializeConnections = async () => {
     }
 };
 
-//============================//
-//       END MY CHANGES       //
-//============================//
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+//~~~~~~~~~END MY CHANGES~~~~~~~~~//
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 
 
@@ -2570,12 +2569,12 @@ window.addEventListener('load', async () => {
         console.log('Service Worker registered with scope:', registration.scope);
     }
 
-    // MY CHANGES
+    // ~~~~~ MY CHANGES ~~~~~
     if (Object.keys(connections).length === 0) {
         console.log('Connections not loaded yet, waiting...');
         await initializeConnections();
     }
-    // END MY CHANGES
+    // ~~~~~ END MY CHANGES ~~~~~
 
     const params = new URLSearchParams(window.location.search);
     const idToFind = params.get('con') || '0'

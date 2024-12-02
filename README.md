@@ -1,5 +1,10 @@
 # sftp-browser
 
+To run the server:
+```shell
+npm run startserver
+```
+
 ## Changes
 
 -   Instead of storing connections in the client browser, these are now stored in the server
