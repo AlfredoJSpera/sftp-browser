@@ -178,6 +178,32 @@ srv.post('/api/sftp/connections/edit', rawBodyParser, async (req, res) => {
     res.json(connection_objects);
 });
 
+srv.post('/api/sftp/connections/create', rawBodyParser, async (req, res) => {
+    const data = JSON.parse(req.body);
+
+    let new_connection = {
+        name: data.name,
+        host: data.host,
+        port: data.port || 22,
+        username: data.username,
+        path: '/'
+    };
+
+    key = data.key;
+    password = data.password;
+
+    if (key) {
+        new_connection["key"] = key;
+    } else {
+        new_connection["password"] = password;
+    }
+
+    const id = Date.now();
+
+    connection_objects[id] = new_connection;
+    res.json(id)
+})
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 //~~~~~~~~~END MY CHANGES~~~~~~~~~//
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -990,6 +1016,22 @@ setInterval(() => {
             delete sessionActivity[hash];
         }
     }
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+    //~~~~~~~~~MY CHANGES~~~~~~~~~//
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+
+    // Inactive connection objects
+    for (const id in connection_objects) {
+        if ((Date.now() - id) > 1000 * 60 * 1) {
+            console.log(`Deleting inactive connection credentials ${id}`);
+            delete connection_objects[id];
+        }
+    }
+
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+    //~~~~~~~~~END MY CHANGES~~~~~~~~~//
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
     // Unused downloads
     for (const id in rawDownloads) {

@@ -97,7 +97,7 @@ let isSearching = false;
 
 
 /**
- * Initializes the `connections` object from the server.
+ * Initializes the `connections` object from `main.js`.
  */
 const initializeConnections = async () => {
     try {
@@ -354,7 +354,11 @@ const connectionManagerDialog = async () => {
  */
 const editConnectionDialog = async (id) => new Promise(resolve => {
     const connection = connections[id];
-    if (!connection) throw new Error(`Connection with ID ${id} not found!`);
+
+    if (!connection) {
+        throw new Error(`Connection with ID ${id} not found!`);
+    }
+
     const securityNote = thing => `Your ${thing} is saved in this browser and only persists on the server during and for a few minutes after each request.`;
     const el = document.createElement('div');
     el.classList = 'col gap-10';
@@ -467,6 +471,7 @@ const editConnectionDialog = async (id) => new Promise(resolve => {
             connection.port = inputPort.value || 22;
             connection.username = inputUsername.value;
             connection.name = inputName.value || `${connection.username}@${connection.host}`;
+
             if (authTypePassword.checked) {
                 connection.password = inputPassword.value;
                 delete connection.key;
@@ -474,7 +479,9 @@ const editConnectionDialog = async (id) => new Promise(resolve => {
                 connection.key = inputKey.value;
                 delete connection.password;
             }
+
             connection.path = inputPath.value;
+            
             saveConnections();
         }));
     popup.addAction(action => action.setLabel('Cancel'));
@@ -2576,18 +2583,22 @@ window.addEventListener('load', async () => {
     }
     // ~~~~~ END MY CHANGES ~~~~~
 
+    // See if there is a connection id passed to the URL
     const params = new URLSearchParams(window.location.search);
+
+    console.log("Params passed (con, path):", params.get('con'), params.get('path'));
+    
     const idToFind = params.get('con') || '0'
     const connection = connections[idToFind];
 
     console.log(`Connection found with ${idToFind}:`, connection)
-    console.log("Params passed (con, path):", params.get('con'), params.get('path'));
 
     if (connection) {
         setActiveConnection(params.get('con'), params.get('path'));
     } else {
         connectionManagerDialog();
     }
+
     window.dispatchEvent(new Event('resize'));
 });
 
