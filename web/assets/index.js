@@ -91,439 +91,35 @@ let searchWebsocket;
 let isSearching = false;
 
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-//~~~~~~~~~MY CHANGES~~~~~~~~~//
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-
-
-/**
- * Initializes the `connections` object from `main.js`.
- */
-const initializeConnections = async () => {
-    try {
-        console.log('[initializeConnections] Loading connections...');
-        const response = await fetch('/api/sftp/connections');
-        
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-
-        connections = await response.json();
-        console.log('[initializeConnections] Connections loaded:', connections);
-    } catch (error) {
-        console.error('[initializeConnections] Failed to load connections:', error);
-        connections = {};
+const getConnectionById = async (id) => {
+    const apiResponse = await fetch(`/api/sftp/connections/${id}`);
+    
+    if (!apiResponse.ok) {
+        throw new Error(`Failed to get connection with ID ${id}`);
     }
+
+    return await apiResponse.json();
 };
-
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-//~~~~~~~~~END MY CHANGES~~~~~~~~~//
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-
-
-
-/**
- * Saves the current state of the `connections` object to the server.
- */
-const saveConnections = async () => {
-    await fetch('/api/sftp/connections/edit', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(connections)
-    });
-    console.log("[saveConnections] New connections saved", connections);
-}
-
-/**
- * Returns the `connections` object as a sorted array, and each value has an added `id` property.
- */
-const getSortedConnectionsArray = () => {
-    const connectionValues = [];
-    console.log("[getSortedConnectionsArray] Starting sort");
-
-    for (const id of Object.keys(connections)) {
-        const connection = connections[id];
-        connectionValues.push({
-            id: id,
-            ...connection
-        });
-        console.log("[getSortedConnectionsArray] Added to array to sort:", id);
-    }
-
-    connectionValues.sort((a, b) => {
-        const aName = a.name.toLowerCase();
-        const bName = b.name.toLowerCase();
-        if (aName < bName) return -1;
-        if (aName > bName) return 1;
-        return 0;
-    });
-    console.log("[getSortedConnectionsArray] Sorted connection values", connectionValues);
-    return connectionValues;
-}
-
-/**
- * Prompts the user to export a connection.
- * @param {number} id The connection ID
- */
-const exportConnectionDialog = async (id) => {
-    const connection = connections[id];
-    const exportBody = document.createElement('div');
-    exportBody.classList = 'col gap-10';
-    exportBody.style.maxWidth = '400px';
-    exportBody.innerHTML = /*html*/`
-        <label class="selectOption">
-            <input type="radio" name="exportCredentials" value="exclude" checked>
-            Without credentials
-        </label>
-        <label class="selectOption">
-            <input type="radio" name="exportCredentials" value="include">
-            With private key or password
-        </label>
-        <small style="color: var(--red3)">Only share exports with credentials with people you trust! These credentials grant access to not only your server's files, but oftentimes an interactive terminal (SSH).</small>
-    `;
-    new PopupBuilder()
-        .setTitle(`Export ${connection.name}`)
-        .addBody(exportBody)
-        .addAction(action => action
-            .setLabel('Export')
-            .setIsPrimary(true)
-            .setClickHandler(() => {
-                const includeCredentials = $('input[name="exportCredentials"]:checked', exportBody).value == 'include';
-                const data = {
-                    name: connection.name,
-                    host: connection.host,
-                    port: connection.port,
-                    username: connection.username,
-                    path: connection.path
-                };
-                if (includeCredentials) {
-                    if (connection.key)
-                        data.key = connection.key;
-                    if (connection.password)
-                        data.password = connection.password;
-                }
-                const blob = new Blob([
-                    JSON.stringify(data)
-                ], {
-                    type: 'application/json'
-                });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${connection.name.replace(/[^a-zA-Z-_\. ]/g, '').trim() || 'connection'}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-            }))
-        .addAction(action => action.setLabel('Cancel'))
-        .show();
-}
-
-/**
- * Opens a dialog popup to manage stored connection information.
- */
-const connectionManagerDialog = async () => {
-    const popup = new PopupBuilder();
-    const el = document.createElement('div');
-    el.id = 'connectionManager';
-    el.classList = 'col gap-15';
-    const connectionValues = getSortedConnectionsArray();
-    for (const connection of connectionValues) {
-        const entry = document.createElement('div');
-        entry.classList = 'entry row gap-10 align-center';
-        entry.innerHTML = /*html*/`
-            <div class="icon flex-no-shrink">cloud</div>
-            <div class="row flex-wrap align-center flex-grow">
-                <div class="col gap-5 flex-grow">
-                    <div class="label">${connection.name}</div>
-                    <small>
-                        ${connection.username}@${connection.host}:${connection.port}
-                        <br>${connection.path}
-                    </small>
-                </div>
-                <div class="row gap-10">
-                    <button class="menu btn iconOnly small secondary" title="Connection options">
-                        <div class="icon">more_vert</div>
-                    </button>
-                    <button class="connect btn iconOnly small" title="Connect">
-                        <div class="icon">arrow_forward</div>
-                    </button>
-                </div>
-            </div>
-        `;
-        $('.btn.menu', entry).addEventListener('click', () => {
-            new ContextMenuBuilder()
-                .addItem(option => option
-                    .setLabel('Edit...')
-                    .setIcon('edit')
-                    .setClickHandler(async () => {
-                        popup.hide();
-                        await editConnectionDialog(connection.id);
-                        connectionManagerDialog();
-                    }))
-                .addItem(option => option
-                    .setLabel('Export...')
-                    .setIcon('download')
-                    .setClickHandler(async () => {
-                        exportConnectionDialog(connection.id);
-                    }))
-                .addSeparator()
-                .addItem(option => option
-                    .setLabel('Delete')
-                    .setIcon('delete')
-                    .setIsDanger(true)
-                    .setClickHandler(async () => {
-                        delete connections[connection.id];
-                        await saveConnections();
-                        entry.remove();
-                    }))
-                .showAtCursor();
-        });
-        $('.btn.connect', entry).addEventListener('click', () => {
-            popup.hide();
-            setActiveConnection(connection.id);
-        });
-        el.appendChild(entry);
-    }
-    const elButtons = document.createElement('div');
-    elButtons.classList = 'row gap-10 flex-wrap';
-    const btnAdd = document.createElement('button');
-    btnAdd.classList = 'btn success small';
-    btnAdd.innerHTML = /*html*/`
-        <div class="icon">add</div>
-        New connection...
-    `;
-    btnAdd.addEventListener('click', async () => {
-        popup.hide();
-        await addNewConnectionDialog();
-        connectionManagerDialog();
-    });
-    elButtons.appendChild(btnAdd);
-    const btnImport = document.createElement('button');
-    btnImport.classList = 'btn secondary small';
-    btnImport.innerHTML = /*html*/`
-        <div class="icon">cloud_upload</div>
-        Import...
-    `;
-    btnImport.addEventListener('click', async () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        input.addEventListener('change', async () => {
-            const file = input.files[0];
-            if (!file) return;
-            popup.hide();
-            const reader = new FileReader();
-            reader.addEventListener('load', async () => {
-                try {
-                    const data = JSON.parse(reader.result);
-                    const id = Date.now();
-                    connections[id] = data;
-                    await saveConnections();
-                    if (!data.key && !data.password) {
-                        return editConnectionDialog(id);
-                    }
-                } catch (error) {
-                    console.error(error);
-                }
-                connectionManagerDialog();
-            });
-            reader.readAsText(file);
-        });
-        input.click();
-    });
-    elButtons.appendChild(btnImport);
-    el.appendChild(elButtons);
-    popup
-        .setTitle('Connections')
-        .addBody(el)
-        .addAction(action => action
-            .setIsPrimary(true)
-            .setLabel('Done')
-            .setClickHandler(() => {
-                saveConnections();
-            }));
-    popup.show();
-}
-
-/**
- * Opens a dialog to edit an existing connection by its ID.
- * @param {number} id The connection ID
- * @returns {Promise<number>} Resolves with the ID passed in
- */
-const editConnectionDialog = async (id) => new Promise(resolve => {
-    const connection = connections[id];
-
-    if (!connection) {
-        throw new Error(`Connection with ID ${id} not found!`);
-    }
-
-    const securityNote = thing => `Your ${thing} is saved in this browser and only persists on the server during and for a few minutes after each request.`;
-    const el = document.createElement('div');
-    el.classList = 'col gap-10';
-    el.innerHTML = /*html*/`
-        <div style="width: 300px; max-width: 100%">
-            <label>Friendly name</label>
-            <input type="text" class="textbox" id="inputName" value="${connection.name}" placeholder="My Server">
-        </div>
-        <div class="row gap-10 flex-wrap">
-            <div style="width: 300px; max-width: 100%">
-                <label>Host</label>
-                <input type="text" class="textbox" id="inputHost" value="${connection.host}" placeholder="example.com">
-            </div>
-            <div style="width: 120px; max-width: 100%">
-                <label>Port</label>
-                <input type="number" class="textbox" id="inputPort" value="${connection.port}" placeholder="22">
-            </div>
-        </div>
-        <div style="width: 200px; max-width: 100%">
-            <label>Username</label>
-            <input type="text" class="textbox" id="inputUsername" value="${connection.username}" placeholder="kayla">
-        </div>
-        <div style="width: 300px; max-width: 100%">
-            <label>Authentication</label>
-            <div class="row gap-10 flex-wrap">
-                <label class="selectOption">
-                    <input id="authTypePassword" type="radio" name="authType" value="password">
-                    Password
-                </label>
-                <label class="selectOption">
-                    <input id="authTypeKey" type="radio" name="authType" value="key">
-                    Private key
-                </label>
-            </div>
-        </div>
-        <div id="passwordCont" style="width: 300px; max-width: 100%" class="col gap-5">
-            <input type="password" class="textbox" id="inputPassword" value="${connection.password || ''}" placeholder="Password">
-            <small>${securityNote('password')}</small>
-        </div>
-        <div id="keyCont" class="col gap-5" style="width: 500px; max-width: 100%">
-            <div class="row">
-                <button id="loadKeyFromFile" class="btn secondary small">
-                    <div class="icon">key</div>
-                    Load from file
-                </button>
-            </div>
-            <div class="textbox textarea">
-                <textarea id="inputKey" placeholder="Private key..." rows="5">${connection.key || ''}</textarea>
-            </div>
-            <small>Your private key is typically located under <b>C:\\Users\\you\\.ssh</b> on Windows, or <b>/home/you/.ssh</b> on Unix. It's not the ".pub" file! The server has to be configured to accept your public key for your private one to work.</small>
-            <small>${securityNote('private key')}</small>
-        </div>
-        <div style="width: 300px; max-width: 100%">
-            <label>Starting path</label>
-            <input type="text" class="textbox" id="inputPath" value="${connection.path}" placeholder="/home/kayla">
-        </div>
-    `;
-    const inputName = $('#inputName', el);
-    const inputHost = $('#inputHost', el);
-    const inputPort = $('#inputPort', el);
-    const inputUsername = $('#inputUsername', el);
-    const authTypePassword = $('#authTypePassword', el);
-    const authTypeKey = $('#authTypeKey', el);
-    const inputPassword = $('#inputPassword', el);
-    const elPasswordCont = $('#passwordCont', el);
-    const elKeyCont = $('#keyCont', el);
-    const inputKey = $('#inputKey', el);
-    const btnLoadKey = $('#loadKeyFromFile', el);
-    const inputPath = $('#inputPath', el);
-    authTypePassword.addEventListener('change', () => {
-        elPasswordCont.style.display = '';
-        elKeyCont.style.display = 'none';
-    });
-    authTypeKey.addEventListener('change', () => {
-        elPasswordCont.style.display = 'none';
-        elKeyCont.style.display = '';
-    });
-    if (!connection.password && !connection.key) {
-        authTypeKey.checked = true;
-        authTypeKey.dispatchEvent(new Event('change'));
-    } else if (!connection.password) {
-        authTypeKey.checked = true;
-        authTypeKey.dispatchEvent(new Event('change'));
-    } else {
-        authTypePassword.checked = true;
-        authTypePassword.dispatchEvent(new Event('change'));
-    }
-    btnLoadKey.addEventListener('click', () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.addEventListener('change', () => {
-            const file = input.files[0];
-            if (file.size > 1024) return;
-            const reader = new FileReader();
-            reader.addEventListener('load', () => {
-                inputKey.value = reader.result;
-            });
-            reader.readAsText(file);
-        });
-        input.click();
-    });
-    const popup = new PopupBuilder()
-        .setTitle('Edit connection')
-        .addBody(el);
-    popup.addAction(action => action
-        .setIsPrimary(true)
-        .setLabel('Save')
-        .setClickHandler(() => {
-            connection.host = inputHost.value;
-            connection.port = inputPort.value || 22;
-            connection.username = inputUsername.value;
-            connection.name = inputName.value || `${connection.username}@${connection.host}`;
-
-            if (authTypePassword.checked) {
-                connection.password = inputPassword.value;
-                delete connection.key;
-            } else {
-                connection.key = inputKey.value;
-                delete connection.password;
-            }
-
-            connection.path = inputPath.value;
-            
-            saveConnections();
-        }));
-    popup.addAction(action => action.setLabel('Cancel'));
-    popup.show();
-    popup.setOnHide(() => resolve(id));
-});
-
-/**
- * Adds a new connection with basic placeholder data and runs `editConnectionDialog()` on it.
- */
-const addNewConnectionDialog = async () => {
-    const id = Date.now();
-    connections[id] = {
-        name: 'New Connection',
-        host: '',
-        port: 22,
-        username: '',
-        key: '',
-        password: '',
-        path: '/'
-    };
-    await editConnectionDialog(id);
-    if (!connections[id].host || !connections[id].username) {
-        delete connections[id];
-    }
-}
 
 /**
  * Sets the active connection to the one with the specified ID.
  * @param {number} id The connection ID
  * @param {string} path An initial directory path to override the saved one
  */
-const setActiveConnection = (id, path) => {
-    console.log("Setting active connection", id);
-    if (!connections[id]) {
-        throw new Error(`Connection with ID ${id} not found!`);
-    }
+const setActiveConnection = async (connection, path) => {
+    console.log("Setting active connection", connection.id);
+
     backPaths = [];
     forwardPaths = [];
-    activeConnection = JSON.parse(JSON.stringify(connections[id]));
+    
+    try {
+        activeConnection = JSON.parse(JSON.stringify(connection));
+    } catch (error) {
+        return setStatus(`Error: Failed to set active connection due to unrecognized JSON`, true);
+    }
     console.log("Active connection", activeConnection);
-    activeConnectionId = id;
+
+    activeConnectionId = connection.id;
     selectionClipboard = [];
     changePath(path, false);
 }
@@ -702,7 +298,12 @@ const searchDirectory = async (path, query) => {
     let maxCount = 500;
     let finishedSuccessfully = false;
     searchWebsocket.addEventListener('message', e => {
-        const data = JSON.parse(e.data);
+        try {
+            const data = JSON.parse(e.data);
+        } catch (error) {
+            return setStatus(`Error: Unrecognized JSON in search web socket`, true);
+        }
+
         if (data.error) {
             setStatus(`Error: ${data.error}`, true, -1);
         }
@@ -1806,7 +1407,11 @@ const uploadFiles = async inputFiles => {
             // Handle messages
             const messageHandlers = [];
             ws.addEventListener('message', e => {
-                const data = JSON.parse(e.data);
+                try {
+                    const data = JSON.parse(e.data);
+                } catch (error) {
+                    return setStatus(`Error: Unrecognized JSON`, true);
+                }
                 console.log(`Message from upload websocket:`, data);
                 if (!data.success) {
                     isUploading = false;
@@ -1942,7 +1547,11 @@ const deleteDirectory = async (path) => {
 const historyContextMenu = (e, btn, paths, menu = new ContextMenuBuilder()) => {
     if (btn.disabled) return;
     e.preventDefault();
-    paths = JSON.parse(JSON.stringify(paths)).reverse();
+    try {
+        paths = JSON.parse(JSON.stringify(paths)).reverse();
+    } catch (error) {
+        return setStatus(`Error: Unrecognized JSON`, true);
+    }
     for (let i = 0; i < 10; i++) {
         let path = paths[i];
         if (!path) break;
@@ -1967,37 +1576,6 @@ const historyContextMenu = (e, btn, paths, menu = new ContextMenuBuilder()) => {
     const rect = btn.getBoundingClientRect();
     menu.showAtCoords(rect.left, rect.bottom - 5);
 }
-
-btnConnections.addEventListener('click', () => {
-    const menu = new ContextMenuBuilder();
-    const connectionValues = getSortedConnectionsArray();
-    for (const connection of connectionValues) {
-        menu.addItem(option => option
-            .setLabel(connection.name)
-            .setIcon('cloud')
-            .setTooltip(`Click to connect to ${connection.name}<br><small>${connection.username}@${connection.host}:${connection.port}<br>${connection.path}</small>`)
-            .setClickHandler(() => {
-                setActiveConnection(connection.id);
-            }));
-    };
-    menu.addSeparator();
-    menu.addItem(option => option
-        .setLabel('Manage connections...')
-        .setIcon('smb_share')
-        .setClickHandler(connectionManagerDialog));
-    menu.addItem(option => option
-        .setLabel('New connection...')
-        .setIcon('library_add')
-        .setClickHandler(addNewConnectionDialog));
-    menu.addSeparator().addItem(item => item
-        .setIcon('code')
-        .setLabel('SFTP Browser GitHub')
-        .setClickHandler(() => {
-            window.open('https://github.com/CyberGen49/sftp-browser');
-        }));
-    const rect = btnConnections.getBoundingClientRect();
-    menu.showAtCoords(rect.left, rect.bottom - 5);
-});
 
 btnNavBack.addEventListener('click', () => {
     if (backPaths.length > 0) {
@@ -2576,27 +2154,23 @@ window.addEventListener('load', async () => {
         console.log('Service Worker registered with scope:', registration.scope);
     }
 
-    // ~~~~~ MY CHANGES ~~~~~
-    if (Object.keys(connections).length === 0) {
-        console.log('Connections not loaded yet, waiting...');
-        await initializeConnections();
-    }
-    // ~~~~~ END MY CHANGES ~~~~~
-
     // See if there is a connection id passed to the URL
     const params = new URLSearchParams(window.location.search);
+    const connectionId = params.get('connection');
+    const path = params.get('path') || '/';
 
-    console.log("Params passed (con, path):", params.get('con'), params.get('path'));
+    if (!connectionId) {
+        return setStatus(`Error: No connection id passed to the URL`, true);
+    }
+
+    console.log(`Params passed (connection = ${connectionId}, path = ${path})`);
     
-    const idToFind = params.get('con') || '0'
-    const connection = connections[idToFind];
-
-    console.log(`Connection found with ${idToFind}:`, connection)
-
-    if (connection) {
-        setActiveConnection(params.get('con'), params.get('path'));
-    } else {
-        connectionManagerDialog();
+    try {
+        const connection = await getConnectionById(connectionId);    
+        console.log(`Connection found with ${connectionId}:`, connection)
+        setActiveConnection(connection, path);
+    } catch (error) {
+        return setStatus(`Error: Cannot find connection with id ${connectionId}`, true);
     }
 
     window.dispatchEvent(new Event('resize'));

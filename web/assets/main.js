@@ -1,4 +1,3 @@
-
 const elProgressBar = $('#progressBar');
 const elStatusBar = $('#statusBar');
 const isElectron = window && window.process && window.process.type;
@@ -10,8 +9,6 @@ let apiHost = window.localStorage.getItem('apiHost') || window.location.host;
 let isLocalhost = window.location.hostname == 'localhost';
 let httpProtocol = isLocalhost ? 'http' : 'https';
 let wsProtocol = httpProtocol == 'http' ? 'ws' : 'wss';
-/** An object of saved connection information */
-let connections = {};
 /** The current active connection */
 let activeConnection = null;
 /** The ID of the current active connection */

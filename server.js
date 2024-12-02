@@ -168,25 +168,28 @@ const initApi = asyncHandler(async (req, res, next) => {
 
 let connection_objects = {}
 
-srv.get('/api/sftp/connections', async (req, res) => {
-    res.json(connection_objects)
-});
+srv.get('/api/sftp/connections/:id', async (req, res) => {
+    const id = req.params.id;
 
-srv.post('/api/sftp/connections/edit', rawBodyParser, async (req, res) => {
-    const data = JSON.parse(req.body);
-    connection_objects = data;
-    res.json(connection_objects);
+    if (!connection_objects[id]) {
+        res.status(404).json("Not found");
+    } else {
+        res.json(connection_objects[id]);
+    }
 });
 
 srv.post('/api/sftp/connections/create', rawBodyParser, async (req, res) => {
     const data = JSON.parse(req.body);
+    const generatedId = crypto.randomUUID();
 
     let new_connection = {
+        id: generatedId,
         name: data.name,
         host: data.host,
         port: data.port || 22,
         username: data.username,
-        path: '/'
+        path: '/',
+        createdTime: Date.now(),
     };
 
     key = data.key;
@@ -194,15 +197,21 @@ srv.post('/api/sftp/connections/create', rawBodyParser, async (req, res) => {
 
     if (key) {
         new_connection["key"] = key;
-    } else {
+    } else if (password) {
         new_connection["password"] = password;
+    } else {
+        res.status(400).json("No key or password provided");
     }
 
-    const id = Date.now();
-
-    connection_objects[id] = new_connection;
-    res.json(id)
+    connection_objects[generatedId] = new_connection;
+    res.json(new_connection);
 })
+
+srv.get('/api/sftp/connections/delete/:id', async (req, res) => {
+    const id = req.params.id;
+    delete connection_objects[id];
+    res.json(JSON.stringify({ success: true, status: 'complete' }));
+});
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 //~~~~~~~~~END MY CHANGES~~~~~~~~~//
@@ -1022,8 +1031,8 @@ setInterval(() => {
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
     // Inactive connection objects
-    for (const id in connection_objects) {
-        if ((Date.now() - id) > 1000 * 60 * 1) {
+    for (const connection in connection_objects) {
+        if ((Date.now() - connection.createdTime) > 1000 * 60 * 1) {
             console.log(`Deleting inactive connection credentials ${id}`);
             delete connection_objects[id];
         }
