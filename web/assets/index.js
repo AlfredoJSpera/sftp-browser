@@ -91,8 +91,12 @@ let searchWebsocket;
 let isSearching = false;
 
 
+/**
+ * Finds a connection by an ID. If not found, throws an error.
+ * @param {number} id The connection ID
+ */
 const getConnectionById = async (id) => {
-    const apiResponse = await fetch(`/api/sftp/connections/${id}`);
+    const apiResponse = await fetch(`/api/sftp/credentials/${id}`);
     
     if (!apiResponse.ok) {
         throw new Error(`Failed to get connection with ID ${id}`);
@@ -171,7 +175,7 @@ const changePath = async (path, pushState = true) => {
             activeConnection.path = dataStats.path;
             // Update display
             document.title = `${activeConnection.name} - ${activeConnection.path}`;
-            window.history.replaceState(null, null, `?con=${activeConnectionId}&path=${encodeURIComponent(activeConnection.path)}`);
+            window.history.replaceState(null, null, `?connection=${activeConnectionId}&path=${encodeURIComponent(activeConnection.path)}`);
             // Load the directory
             await loadDirectory(dataStats.path);
             // Otherwise, show an error
@@ -778,7 +782,7 @@ const toggleHiddenFileVisibility = () => {
  * @param {string} path The file path.
  */
 const openFileViewer = path => {
-    const url = `/file.html?con=${activeConnectionId}&path=${encodeURIComponent(path)}`;
+    const url = `/file.html?connection=${activeConnectionId}&path=${encodeURIComponent(path)}`;
     const isStandalone =
         window.matchMedia('(display-mode: standalone)').matches
         || window.matchMedia('(display-mode: minimal-ui)').matches;

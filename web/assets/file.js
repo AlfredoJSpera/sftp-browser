@@ -4,10 +4,24 @@ const elControls = $('#controls');
 const elPreview = $('#preview');
 const btnDownload = $('#download');
 const query = new URLSearchParams(window.location.search);
-let path = query.get('path');
-activeConnection = connections[query.get('con')];
 let fileStats = null;
 let editor;
+let path = query.get('path');
+const id = query.get('connection')
+
+/**
+ * Finds a connection by an ID. If not found, throws an error.
+ * @param {number} id The connection ID
+ */
+const getConnectionById = async (id) => {
+    const apiResponse = await fetch(`/api/sftp/credentials/${id}`);
+    
+    if (!apiResponse.ok) {
+        throw new Error(`Failed to get connection with ID ${id}`);
+    }
+
+    return await apiResponse.json();
+};
 
 const updatePreview = async() => {
     // Make sure the file is viewable
@@ -444,7 +458,15 @@ const getUpdatedStats = async() => {
 }
 
 window.addEventListener('load', async() => {
+    try {
+        activeConnection = await getConnectionById(id);    
+        console.log(`Connection found with ${id}:`, activeConnection)
+    } catch (error) {
+        return setStatus(`Error: Cannot find connection with id ${id}`, true);
+    }
+    
     const res = await getUpdatedStats();
+    
     if (!res.error) {
         // Update navbar
         path = res.path;

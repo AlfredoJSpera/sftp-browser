@@ -166,19 +166,23 @@ const initApi = asyncHandler(async (req, res, next) => {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
 
-let connection_objects = {}
+let credentials = {}
 
-srv.get('/api/sftp/connections/:id', async (req, res) => {
+srv.get('/api/sftp/credentials', async (req, res) => {
+    res.json(credentials);
+});
+
+srv.get('/api/sftp/credentials/:id', async (req, res) => {
     const id = req.params.id;
 
-    if (!connection_objects[id]) {
+    if (!credentials[id]) {
         res.status(404).json("Not found");
     } else {
-        res.json(connection_objects[id]);
+        res.json(credentials[id]);
     }
 });
 
-srv.post('/api/sftp/connections/create', rawBodyParser, async (req, res) => {
+srv.post('/api/sftp/credentials/create', rawBodyParser, async (req, res) => {
     const data = JSON.parse(req.body);
     const generatedId = crypto.randomUUID();
 
@@ -203,13 +207,13 @@ srv.post('/api/sftp/connections/create', rawBodyParser, async (req, res) => {
         res.status(400).json("No key or password provided");
     }
 
-    connection_objects[generatedId] = new_connection;
+    credentials[generatedId] = new_connection;
     res.json(new_connection);
 })
 
-srv.get('/api/sftp/connections/delete/:id', async (req, res) => {
+srv.get('/api/sftp/credentials/delete/:id', async (req, res) => {
     const id = req.params.id;
-    delete connection_objects[id];
+    delete credentials[id];
     res.json(JSON.stringify({ success: true, status: 'complete' }));
 });
 
@@ -1030,11 +1034,11 @@ setInterval(() => {
     //~~~~~~~~~MY CHANGES~~~~~~~~~//
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
-    // Inactive connection objects
-    for (const connection in connection_objects) {
-        if ((Date.now() - connection.createdTime) > 1000 * 60 * 1) {
-            console.log(`Deleting inactive connection credentials ${id}`);
-            delete connection_objects[id];
+    // Inactive credential objects
+    for (const credential in credentials) {
+        if ((Date.now() - credential.createdTime) > 1000 * 60 * 1) {
+            console.log(`Deleting unused credentials ${id}`);
+            delete credentials[id];
         }
     }
 
