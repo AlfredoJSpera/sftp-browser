@@ -36,28 +36,58 @@ const normalizeRemotePath = remotePath => {
     return joined;
 };
 
-
 /** Maps session hashes to SFTP session objects. */
 const sessions = {};
 /** Maps session hashes to the last activity timestamp. */
 const sessionActivity = {};
 
+/** Holds the credentials for SFTP connections, has an UUID as an ID. */
+const credentials = {};
+/** Maps session hashes to credentials. */
+const sessionCredentials = {};
+
 /** Generates a SHA-256 hash for a given object. */
-const getObjectHash = obj => {
+const getObjectHash = (obj) => {
     const hash = crypto.createHash('sha256');
     hash.update(JSON.stringify(obj));
     return hash.digest('hex');
 }
 
 /**
+ * Searches in the `credentials` object a credential that has the same parameters
+ * passed in the `opts`.
+ * @returns The credential if found, null otherwise
+ */
+const findCredentialsWithOpts = (opts) => {
+    for (const id in credentials) {
+        const credential = credentials[id];
+        const host = credential.host;
+        const port = credential.port;
+        const username = credential.username;
+        const password = credential.password;
+        const key = credential.key;
+
+        if (host === opts.host &&
+            port === opts.port &&
+            username === opts.username &&
+            (password === opts.password || key === opts.key)
+        ) {
+            return credential
+        }
+    }
+    return null
+};
+
+/**
  * Manages SFTP sessions, either reusing existing ones or creating new ones.
+ * @param {Response} res The response to send to the request if there is an error
  * @param {sftp.ConnectOptions} opts The SFTP connection parameters.
  * @returns {Promise<sftp>|null} The SFTP session object, or an error if the connection failed.
  */
 const getSession = async (res, opts) => {
     const hash = getObjectHash(opts);
     const address = `${opts.username}@${opts.host}:${opts.port}`;
-
+    
     // Check if a session already exists
     if (sessions[hash]) {
         console.log(`Using existing connection to ${address}`);
@@ -65,14 +95,31 @@ const getSession = async (res, opts) => {
         return sessions[hash];
     }
 
+    const credential = findCredentialsWithOpts(opts)
+
     // Create a new session
     console.log(`Creating new connection to ${address}`);
     const session = new sftp();
     sessions[hash] = session;
+    sessionCredentials[hash] = credential;
 
     // Handle session events
-    session.on('end', () => delete sessions[hash]);
-    session.on('close', () => delete sessions[hash]);
+    session.on('end', () => {
+        delete sessions[hash];
+        let x = sessionCredentials[hash];
+        if (x) {
+            delete credentials[x.id]
+        }
+        delete sessionCredentials[hash];
+    });
+    session.on('close', () => {
+        delete sessions[hash];
+        let x = sessionCredentials[hash];
+        if (x) {
+            delete credentials[x.id]
+        }
+        delete sessionCredentials[hash];
+    });
 
     try {
         // Connect to the SFTP server
@@ -80,6 +127,11 @@ const getSession = async (res, opts) => {
         sessionActivity[hash] = Date.now();
     } catch (error) {
         delete sessions[hash];
+        let x = sessionCredentials[hash];
+        if (x) {
+            delete credentials[x.id]
+        }
+        delete sessionCredentials[hash];
         console.log(`Connection to ${address} failed`);
         return res ? res.sendError(error) : null;
     }
@@ -164,9 +216,6 @@ const initApi = asyncHandler(async (req, res, next) => {
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 //~~~~~~~~~MY CHANGES~~~~~~~~~//
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-
-
-let credentials = {}
 
 srv.get('/api/sftp/credentials', async (req, res) => {
     res.json(credentials);
@@ -1021,30 +1070,22 @@ setInterval(() => {
     // Inactive sessions
     for (const hash in sessions) {
         const lastActive = sessionActivity[hash];
-        if (!lastActive) continue;
+        const credential = sessionCredentials[hash];
+
+        if (!lastActive || !credential) continue;
+        
         if ((Date.now() - lastActive) > 1000 * 60 * 5) {
-            console.log(`Deleting inactive sftp session`);
+            console.log(`Deleting inactive sftp session ${hash}`);
             sessions[hash].end();
             delete sessions[hash];
             delete sessionActivity[hash];
+            let x = sessionCredentials[hash];
+            if (x) {
+                delete credentials[x.id]
+            }
+            delete sessionCredentials[hash];
         }
     }
-
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-    //~~~~~~~~~MY CHANGES~~~~~~~~~//
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-
-    // Inactive credential objects
-    for (const credential in credentials) {
-        if ((Date.now() - credential.createdTime) > 1000 * 60 * 1) {
-            console.log(`Deleting unused credentials ${id}`);
-            delete credentials[id];
-        }
-    }
-
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
-    //~~~~~~~~~END MY CHANGES~~~~~~~~~//
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
     // Unused downloads
     for (const id in rawDownloads) {
@@ -1054,6 +1095,12 @@ setInterval(() => {
             delete rawDownloads[id];
         }
     }
+
+    // console.log("Remaining sessions:", sessions);
+    // console.log("Remaining sessionsActivity:", sessionActivity);
+    // console.log("Remaining sessionCredentials:", sessionCredentials);
+    // console.log("Remaining credentials:", credentials);
+    // console.log("---------------------------------------");
 }, 1000 * 30);
 
 //============================//
