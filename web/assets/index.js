@@ -1411,8 +1411,9 @@ const uploadFiles = async inputFiles => {
             // Handle messages
             const messageHandlers = [];
             ws.addEventListener('message', e => {
+                let data;
                 try {
-                    const data = JSON.parse(e.data);
+                    data = JSON.parse(e.data);
                 } catch (error) {
                     return setStatus(`Error: Unrecognized JSON`, true);
                 }
