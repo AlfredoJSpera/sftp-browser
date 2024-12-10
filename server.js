@@ -983,7 +983,7 @@ srv.get('/api/sftp/files/get/single/url', initApi, async (req, res) => {
 
     // Generate download URL
     const id = utils.randomHex(8);
-    res.data.download_url = `https://${req.get('host')}/dl/${id}`;
+    res.data.download_url = `http://${req.get('host')}/dl/${id}`;
 
     // Create download handler
     rawDownloads[id] = {
@@ -1010,7 +1010,7 @@ srv.get('/api/sftp/files/get/multi/url', initApi, async (req, res) => {
 
     // Generate download URL
     const id = utils.randomHex(8);
-    res.data.download_url = `https://${req.get('host')}/dl/${id}`;
+    res.data.download_url = `http://${req.get('host')}/dl/${id}`;
 
     // Create download handler
     rawDownloads[id] = {
