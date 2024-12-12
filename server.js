@@ -104,22 +104,23 @@ const getSession = async (res, opts) => {
     sessions[hash] = session;
     sessionCredentials[hash] = credential;
 
+    const deletion_function = () => {
+        delete sessions[hash];
+        // let x = sessionCredentials[hash];
+        // if (x) {
+        //     delete credentials[x.id]
+        // }
+        // delete sessionCredentials[hash];
+    }
+
     // Handle session events
     session.on('end', () => {
-        delete sessions[hash];
-        let x = sessionCredentials[hash];
-        if (x) {
-            delete credentials[x.id]
-        }
-        delete sessionCredentials[hash];
+        console.log("In end")
+        deletion_function()
     });
     session.on('close', () => {
-        delete sessions[hash];
-        let x = sessionCredentials[hash];
-        if (x) {
-            delete credentials[x.id]
-        }
-        delete sessionCredentials[hash];
+        console.log("In close")
+        deletion_function()
     });
 
     try {
@@ -127,6 +128,7 @@ const getSession = async (res, opts) => {
         await session.connect(opts);
         sessionActivity[hash] = Date.now();
     } catch (error) {
+        console.log("In catch")
         delete sessions[hash];
         let x = sessionCredentials[hash];
         if (x) {
@@ -220,6 +222,10 @@ const initApi = asyncHandler(async (req, res, next) => {
 
 srv.get('/api/sftp/credentials', async (req, res) => {
     res.json(credentials);
+});
+
+srv.get('/api/sftp/sessions', async (req, res) => {
+    res.json(Object.keys(sessions).length);
 });
 
 srv.get('/api/sftp/credentials/:id', async (req, res) => {
@@ -1068,7 +1074,7 @@ srv.use((req, res) => res.status(404).end());
 
 // Delete inactive sessions and downloads
 setInterval(() => {
-    console.log(`-----------Deletion interval start, connections=${Object.keys(sessions).length}`)
+    //console.log(`-----------Deletion interval start, connections=${Object.keys(sessions).length}`)
     const max_time_passed = 1000 * 60 * 5;
     const download_max_time_passed = 1000 * 60 * 60 * 12;
 
@@ -1080,10 +1086,10 @@ setInterval(() => {
 
         if (!lastActive || !credential) continue;
 
-        console.log(`[connection deletion] connection: ${hash}`)
-        console.log(`[connection deletion] lastActive: ${Date(lastActive)}`)
-        console.log(`[connection deletion] difference in time: ${(time_passed_since_last_active)/1000}s`)
-        console.log(`[connection deletion] tolerance: ${max_time_passed/1000}s`)
+        // console.log(`[connection deletion] connection: ${hash}`)
+        // console.log(`[connection deletion] lastActive: ${Date(lastActive)}`)
+        // console.log(`[connection deletion] difference in time: ${(time_passed_since_last_active)/1000}s`)
+        // console.log(`[connection deletion] tolerance: ${max_time_passed/1000}s`)
         
         if (time_passed_since_last_active > max_time_passed) {
             console.log(`Deleting inactive sftp session ${hash}`);

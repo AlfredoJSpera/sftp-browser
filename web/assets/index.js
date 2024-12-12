@@ -787,9 +787,51 @@ const openFileViewer = path => {
         window.matchMedia('(display-mode: standalone)').matches
         || window.matchMedia('(display-mode: minimal-ui)').matches;
     if (!isStandalone) {
-        // Open in new tab
-        window.open(url, '_blank');
-        setStatus(`File opened in new tab`);
+        // Open in an iframe
+        let iframeContainer = document.getElementById('fileViewerContainer');
+        
+        // Create the container if it doesn't exist
+        if (!iframeContainer) {
+            iframeContainer = document.createElement('div');
+            iframeContainer.id = 'fileViewerContainer';
+            iframeContainer.style.position = 'fixed';
+            iframeContainer.style.top = '10%';
+            iframeContainer.style.left = '10%';
+            iframeContainer.style.width = '80%';
+            iframeContainer.style.height = '80%';
+            iframeContainer.style.backgroundColor = '#fff';
+            iframeContainer.style.boxShadow = '0px 4px 10px rgba(0, 0, 0, 0.2)';
+            iframeContainer.style.zIndex = '1000';
+            iframeContainer.style.border = '1px solid #ccc';
+            iframeContainer.style.overflow = 'hidden';
+            
+            // Add a close button
+            const closeButton = document.createElement('button');
+            closeButton.innerText = 'Close';
+            closeButton.style.position = 'absolute';
+            closeButton.style.top = '10px';
+            closeButton.style.left = '10px';
+            closeButton.style.zIndex = '1001';
+            closeButton.onclick = () => iframeContainer.remove();
+            
+            iframeContainer.appendChild(closeButton);
+            document.body.appendChild(iframeContainer);
+        }
+        
+        // Add the iframe
+        let iframe = document.getElementById('fileViewerIframe');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'fileViewerIframe';
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            iframeContainer.appendChild(iframe);
+        }
+        
+        // Set the URL
+        iframe.src = url;
+        setStatus(`File opened in embedded viewer`);
     } else {
         // Set size
         const viewerWidth = parseInt(window.localStorage.getItem('viewerWidth')) || window.innerWidth;

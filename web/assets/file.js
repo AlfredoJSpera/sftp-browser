@@ -13,7 +13,7 @@ const id = query.get('connection')
  * Finds a connection by an ID. If not found, throws an error.
  * @param {number} id The connection ID
  */
-const getConnectionById = async (id) => {
+const getFileConnectionById = async (id) => {
     const apiResponse = await fetch(`/api/sftp/credentials/${id}`);
     
     if (!apiResponse.ok) {
@@ -459,7 +459,7 @@ const getUpdatedStats = async() => {
 
 window.addEventListener('load', async() => {
     try {
-        activeConnection = await getConnectionById(id);    
+        activeConnection = await getFileConnectionById(id);    
         console.log(`Connection found with ${id}:`, activeConnection)
     } catch (error) {
         return setStatus(`Error: Cannot find connection with id ${id}`, true);
