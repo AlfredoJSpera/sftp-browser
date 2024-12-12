@@ -61,6 +61,7 @@ const getObjectHash = (obj) => {
 const findCredentialsWithOpts = (opts) => {
     for (const id in credentials) {
         const credential = credentials[id];
+
         const host = credential.host;
         const port = credential.port;
         const username = credential.username;
@@ -1067,14 +1068,24 @@ srv.use((req, res) => res.status(404).end());
 
 // Delete inactive sessions and downloads
 setInterval(() => {
+    console.log(`-----------Deletion interval start, connections=${Object.keys(sessions).length}`)
+    const max_time_passed = 1000 * 60 * 5;
+    const download_max_time_passed = 1000 * 60 * 60 * 12;
+
     // Inactive sessions
     for (const hash in sessions) {
         const lastActive = sessionActivity[hash];
         const credential = sessionCredentials[hash];
+        const time_passed_since_last_active = Date.now() - lastActive;
 
         if (!lastActive || !credential) continue;
+
+        console.log(`[connection deletion] connection: ${hash}`)
+        console.log(`[connection deletion] lastActive: ${Date(lastActive)}`)
+        console.log(`[connection deletion] difference in time: ${(time_passed_since_last_active)/1000}s`)
+        console.log(`[connection deletion] tolerance: ${max_time_passed/1000}s`)
         
-        if ((Date.now() - lastActive) > 1000 * 60 * 5) {
+        if (time_passed_since_last_active > max_time_passed) {
             console.log(`Deleting inactive sftp session ${hash}`);
             sessions[hash].end();
             delete sessions[hash];
@@ -1087,20 +1098,15 @@ setInterval(() => {
         }
     }
 
+
     // Unused downloads
     for (const id in rawDownloads) {
         const download = rawDownloads[id];
-        if ((Date.now() - download.created) > 1000 * 60 * 60 * 12) {
+        if ((Date.now() - download.created) > download_max_time_passed) {
             console.log(`Deleting unused download`);
             delete rawDownloads[id];
         }
     }
-
-    // console.log("Remaining sessions:", sessions);
-    // console.log("Remaining sessionsActivity:", sessionActivity);
-    // console.log("Remaining sessionCredentials:", sessionCredentials);
-    // console.log("Remaining credentials:", credentials);
-    // console.log("---------------------------------------");
 }, 1000 * 30);
 
 //============================//
