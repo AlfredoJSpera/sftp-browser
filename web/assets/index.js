@@ -807,11 +807,18 @@ const openFileViewer = path => {
             
             // Add a close button
             const closeButton = document.createElement('button');
-            closeButton.innerText = 'Close';
+            closeButton.className = 'btn secondary iconOnly';
+            closeButton.title = 'Close';
             closeButton.style.position = 'absolute';
             closeButton.style.top = '10px';
             closeButton.style.left = '10px';
             closeButton.style.zIndex = '1001';
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = 'icon';
+            iconDiv.innerText = 'close';
+
+            closeButton.appendChild(iconDiv);
             closeButton.onclick = () => iframeContainer.remove();
             
             iframeContainer.appendChild(closeButton);
