@@ -204,6 +204,7 @@ class SftpConnectionManager {
 	 * If you need to add an existing connection, use `connections.set(key, value)`.
 	 * @param {string} key - Can be an UUID or the hash of the connection options
 	 * @param {Credentials} credentials - The credentials for the SFTP connection
+	 * @returns {SftpConnection} The new connection object
 	 */
 	addNewConnection(key, credentials) {
 		if (this.connections.has(key)) {
@@ -214,6 +215,8 @@ class SftpConnectionManager {
 		connection.setCredentials(credentials);
 		
 		this.connections.set(key, connection);
+
+		return connection;
 	}
 
 	/**
@@ -251,13 +254,18 @@ class SftpConnectionManager {
 	 * @returns {SftpConnection | undefined} The connection object or `undefined` if it does not exist
 	 */
 	getConnectionByCredentials(host, port, username, password, sshKey) {
-		const hash = getObjectHash({ host, port, username, password, sshKey });
+		// Fancy method, but it's not working
+		// const hash = getObjectHash({ host, port, username, password, sshKey });
 		
 		for (const connection of this.connections.values()) {
-			if (connection.credentialsHash === hash) {
-				return connection;
+			if (connection.credentials.host === host && 
+				connection.credentials.port == port && 
+				connection.credentials.username === username &&
+				(connection.credentials.password === password || connection.credentials.privateKey === sshKey)) {
+					return connection;
 			}
 		}
+		
 
 		return undefined;
 	}
@@ -371,6 +379,12 @@ const getSession = async (res, sftpConnectionOptions) => {
 		return connection.session;
 	}
 
+	console.log("Host: " + host);
+	console.log("Port: " + port);
+	console.log("Username: " + username);
+	console.log("Password: " + password);
+	console.log("Private Key: " + privateKey);
+
 	// Create a new session
 	// There should be already a connection with the same credentials,
 	// created with a previous request to `/api/sftp/credentials/create`
@@ -385,7 +399,7 @@ const getSession = async (res, sftpConnectionOptions) => {
 	console.log(`Creating new session to ${address}`);
 	const session = new sftp();
 	connection.setSession(session);
-	connection.updateLastActivity();
+	connection.updateLastSessionActivity();
 
 	const deletion_function = () => {
 		sftpConnections.removeConnection(hash);
@@ -495,12 +509,12 @@ const initApi = asyncHandler(async (req, res, next) => {
 
 srv.get('/api/sftp/credentials', async (req, res) => {
 	const length = Object.keys(sftpConnections.getAllCredentials()).length;
-	res.json(JSON.stringify({ success: true, lenght: length }));
+	res.json({ success: true, lenght: length });
 });
 
 srv.get('/api/sftp/sessions', async (req, res) => {
 	const length = Object.keys(sftpConnections.getAllSessions()).length;
-	res.json(JSON.stringify({ success: true, lenght: length }));
+	res.json({ success: true, lenght: length });
 });
 
 srv.get('/api/sftp/credentials/:id', async (req, res) => {
@@ -508,7 +522,7 @@ srv.get('/api/sftp/credentials/:id', async (req, res) => {
 	const connection = sftpConnections.getConnection(id);
 
 	if (connection) {
-		res.json(JSON.stringify({ success: true, credentials: connection.credentials }));
+		res.json({ success: true, credentials: connection.credentials, key: connection.key });
 	} else {
 		res.status(404).json("Not found");
 	}
@@ -521,7 +535,7 @@ srv.post('/api/sftp/credentials/create', rawBodyParser, async (req, res) => {
 		data = JSON.parse(req.body);
 	} catch (error) {
 		console.log(error);
-		res.status(400).json(JSON.stringify({ success: false, error: "JSON parse error" }));
+		res.status(400).json({ success: false, error: "JSON parse error" });
 	}
 
 	try {
@@ -535,10 +549,10 @@ srv.post('/api/sftp/credentials/create', rawBodyParser, async (req, res) => {
 			data.privateKey
 		);
 
-		sftpConnections.addNewConnection(credentials.getHash(), credentials);
-		res.json(JSON.stringify({ success: true, credentials: credentials }));
+		const connection = sftpConnections.addNewConnection(credentials.getHash(), credentials);
+		res.json({ success: true, credentials: credentials, key: connection.key });
 	} catch (error) {
-		res.status(400).json(JSON.stringify({ success: false, error: error.message }));
+		res.status(400).json({ success: false, error: error.message });
 	}
 })
 
@@ -546,9 +560,9 @@ srv.get('/api/sftp/credentials/delete/:id', async (req, res) => {
 	const id = req.params.id;
 
 	if (sftpConnections.removeConnection(id)) {
-		res.json(JSON.stringify({ success: true, deleted: id }));
+		res.json({ success: true, deleted: id });
 	} else {
-		res.status(404).json(JSON.stringify({ success: false, error: `Object '${id}' not found` }));
+		res.status(404).json({ success: false, error: `Object '${id}' not found` });
 	}
 });
 

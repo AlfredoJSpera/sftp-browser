@@ -207,15 +207,21 @@ const getIsMobileDevice = () => {
  * Returns an object of headers for API requests that interface with the current active server
  */
 const getHeaders = () => {
+    const host = activeConnection.credentials.host;
+    const port = activeConnection.credentials.port;
+    const username = activeConnection.credentials.username;
+    const password = activeConnection.credentials.password;
+    const privateKey = activeConnection.credentials.privateKey;
+    
     const headers = {
-        'sftp-host': activeConnection.host,
-        'sftp-port': activeConnection.port,
-        'sftp-username': activeConnection.username
+        'sftp-host': host,
+        'sftp-port': port,
+        'sftp-username': username
     };
-    if (activeConnection.password)
-        headers['sftp-password'] = encodeURIComponent(activeConnection.password);
-    if (activeConnection.key)
-        headers['sftp-key'] = encodeURIComponent(activeConnection.key);
+    if (password)
+        headers['sftp-password'] = encodeURIComponent(password);
+    if (privateKey)
+        headers['sftp-key'] = encodeURIComponent(privateKey);
     return headers;
 }
 
@@ -231,9 +237,11 @@ const api = {
      */
     request: async (method, url, params, body = null, onProgress = () => { }, responseType = 'json') => {
         url = `${httpProtocol}://${apiHost}/api/sftp/${url}`;
+        const headers = getHeaders();
+
         try {
             const opts = {
-                params, headers: getHeaders(),
+                params, headers: headers,
                 onUploadProgress: onProgress,
                 onDownloadProgress: onProgress,
                 responseType: responseType

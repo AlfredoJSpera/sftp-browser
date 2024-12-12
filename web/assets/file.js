@@ -470,7 +470,7 @@ window.addEventListener('load', async() => {
     if (!res.error) {
         // Update navbar
         path = res.path;
-        document.title = `${activeConnection.name} - ${path}`;
+        document.title = `${activeConnection.credentials.name} - ${path}`;
         const pathSplit = path.split('/');
         const folderPath = `${pathSplit.slice(0, pathSplit.length - 1).join('/')}/`;
         const fileName = pathSplit[pathSplit.length - 1];

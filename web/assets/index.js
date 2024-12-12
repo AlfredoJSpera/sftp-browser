@@ -123,7 +123,7 @@ const setActiveConnection = async (connection, path) => {
     }
     console.log("Active connection", activeConnection);
 
-    activeConnectionId = connection.id;
+    activeConnectionId = connection.key;
     selectionClipboard = [];
     changePath(path, false);
 }
@@ -139,7 +139,7 @@ const changePath = async (path, pushState = true) => {
     // Lock file selection to prevent double-clicking during load
     fileAccessLock = true;
     // Use the current path if none is specified
-    path = path || activeConnection.path;
+    path = path || activeConnection.credentials.path;
     // Disable nav buttons during load
     btnNavBack.disabled = true;
     btnNavForward.disabled = true;
@@ -163,19 +163,19 @@ const changePath = async (path, pushState = true) => {
                 await downloadFile(dataStats.path);
             }
             // Update the path bar
-            inputNavPath.value = activeConnection.path;
+            inputNavPath.value = activeConnection.credentials.path;
             // If the path is a directory
         } else if (dataStats.stats.isDirectory) {
             // Update the path bar
             inputNavPath.value = dataStats.path;
             // If the path has changed, push the old path to the back history
-            if (pushState && activeConnection.path != path)
-                backPaths.push(activeConnection.path);
+            if (pushState && activeConnection.credentials.path != path)
+                backPaths.push(activeConnection.credentials.path);
             // Update the stored current path
-            activeConnection.path = dataStats.path;
+            activeConnection.credentials.path = dataStats.path;
             // Update display
-            document.title = `${activeConnection.name} - ${activeConnection.path}`;
-            window.history.replaceState(null, null, `?connection=${activeConnectionId}&path=${encodeURIComponent(activeConnection.path)}`);
+            document.title = `${activeConnection.credentials.name} - ${activeConnection.credentials.path}`;
+            window.history.replaceState(null, null, `?connection=${activeConnectionId}&path=${encodeURIComponent(activeConnection.credentials.path)}`);
             // Load the directory
             await loadDirectory(dataStats.path);
             // Otherwise, show an error
@@ -276,7 +276,7 @@ const searchDirectory = async (path, query) => {
     let startTime = Date.now();
     isSearching = true;
     setStatus(`Starting search...`);
-    document.title = `${activeConnection.name} - Searching for "${query}" in ${path}`;
+    document.title = `${activeConnection.credentials.name} - Searching for "${query}" in ${path}`;
     // Disable controls
     updateDirControls();
     btnUpload.disabled = true;
@@ -658,7 +658,7 @@ const fileContextMenu = (elDisplay = null) => {
         item.setIcon('conversion_path')
             .setLabel('Copy path')
             .setClickHandler(() => {
-                const path = isNoneSelected ? activeConnection.path : selectedFiles[0].dataset.path;
+                const path = isNoneSelected ? activeConnection.credentials.path : selectedFiles[0].dataset.path;
                 navigator.clipboard.writeText(path);
                 setStatus(`Copied path to clipboard`);
             })
@@ -1048,7 +1048,7 @@ const createDirectoryDialog = () => {
             .setClickHandler(async () => {
                 const name = inputDirName.value;
                 if (!name) return;
-                const path = `${activeConnection.path}/${name}`;
+                const path = `${activeConnection.credentials.path}/${name}`;
                 const data = await api.post('directories/create', { path: path });
                 if (data.error) {
                     setStatus(`Error: ${data.error}`, true);
@@ -1133,7 +1133,7 @@ const renameFileDialog = async (path, shouldReload = true) => new Promise(resolv
  * @param {string} [actionLabel] The label of the confirm button
  * @returns {Promise<string|null>} A promise resolving to the selected directory path, or `null` if cancelled
  */
-const selectDirDialog = async (startPath = activeConnection.path, title = 'Select folder', actionLabel = 'Select') => new Promise(resolve => {
+const selectDirDialog = async (startPath = activeConnection.credentials.path, title = 'Select folder', actionLabel = 'Select') => new Promise(resolve => {
     const el = document.createElement('div');
     el.innerHTML = /*html*/`
         <div class="moveFilesPicker col gap-10" style="width: 500px; max-width: 100%">
@@ -1390,7 +1390,7 @@ const uploadFiles = async inputFiles => {
     isUploading = true;
     let isCancelled = false;
     let replaceStatus = { type: 'skip', all: false };
-    let dirPath = activeConnection.path;
+    let dirPath = activeConnection.credentials.path;
     // Handle status and progress bar
     let lastStatusSet = 0;
     const setUploadStatus = (text, progress = 0) => {
@@ -1519,7 +1519,7 @@ const uploadFiles = async inputFiles => {
         // Add the path to the list of uploaded files
         paths.push(path);
         // Add the file to the file list
-        if (dirPath == activeConnection.path) {
+        if (dirPath == activeConnection.credentials.path) {
             const elExisting = $(`.fileEntry[data-path="${path}"]`, elFiles);
             if (elExisting) elExisting.remove();
             const elFile = getFileEntryElement({
@@ -1633,13 +1633,13 @@ const historyContextMenu = (e, btn, paths, menu = new ContextMenuBuilder()) => {
 
 btnNavBack.addEventListener('click', () => {
     if (backPaths.length > 0) {
-        forwardPaths.push(activeConnection.path);
+        forwardPaths.push(activeConnection.credentials.path);
         changePath(backPaths.pop(), false);
     }
 });
 btnNavForward.addEventListener('click', () => {
     if (forwardPaths.length > 0) {
-        backPaths.push(activeConnection.path);
+        backPaths.push(activeConnection.credentials.path);
         changePath(forwardPaths.pop(), false);
     }
 });
@@ -1672,8 +1672,8 @@ btnPathPopup.addEventListener('click', () => {
                         .setIsPrimary(true)
                         .setLabel('Go')
                         .setClickHandler(() => {
-                            const path = $('#inputGoToPath', popup.el).value || activeConnection.path;
-                            if (path == activeConnection.path) return;
+                            const path = $('#inputGoToPath', popup.el).value || activeConnection.credentials.path;
+                            if (path == activeConnection.credentials.path) return;
                             changePath(path);
                             popup.hide();
                         }))
@@ -1681,7 +1681,7 @@ btnPathPopup.addEventListener('click', () => {
                 const elBody = $('.body', popup.el);
                 elBody.innerHTML = /*html*/`
                     <div style="width: 400px; max-width: 100%">
-                        <input type="text" class="textbox" id="inputGoToPath" placeholder="${activeConnection.path}" value="${activeConnection.path}">
+                        <input type="text" class="textbox" id="inputGoToPath" placeholder="${activeConnection.credentials.path}" value="${activeConnection.credentials.path}">
                     </div>
                 `;
                 const input = $('#inputGoToPath', elBody);
@@ -1696,7 +1696,7 @@ btnPathPopup.addEventListener('click', () => {
                     input.select();
                 }, 100);
             }));
-    const pathSplit = activeConnection.path.split('/');
+    const pathSplit = activeConnection.credentials.path.split('/');
     pathSplit.pop();
     if (pathSplit.length > 0) {
         menu.addSeparator();
@@ -1754,7 +1754,7 @@ btnSelectionCopy.addEventListener('click', () => {
     updateDirControls();
 });
 btnSelectionPaste.addEventListener('click', async () => {
-    const newDirPath = activeConnection.path;
+    const newDirPath = activeConnection.credentials.path;
     if (!newDirPath) return;
     // Move files
     let newPaths = true;
@@ -1782,7 +1782,7 @@ btnSelectionMoveTo.addEventListener('click', () => moveFilesDialog(false));
 btnSelectionCopyTo.addEventListener('click', () => moveFilesDialog(true));
 
 btnFileCreate.addEventListener('click', async () => {
-    let dir = activeConnection.path;
+    let dir = activeConnection.credentials.path;
     let filePath = await getAvailableFileName(dir, 'file.txt');
     const data = await api.post('files/create', { path: filePath }, '');
     if (data.error) {
@@ -1955,7 +1955,7 @@ btnSelectionPerms.addEventListener('click', async () => {
 
 btnDownload.addEventListener('click', () => {
     const selected = [...getSelectedFiles()];
-    const rootPath = activeConnection.path;
+    const rootPath = activeConnection.credentials.path;
     if (selected.length == 1) {
         if (selected[0].dataset.type === 'd') {
             downloadZip([selected[0].dataset.path], rootPath);
@@ -1965,7 +1965,7 @@ btnDownload.addEventListener('click', () => {
     } else if (selected.length > 1) {
         downloadZip(selected.map(el => el.dataset.path), rootPath);
     } else {
-        downloadZip([activeConnection.path], rootPath);
+        downloadZip([activeConnection.credentials.path], rootPath);
     }
 });
 
@@ -1983,15 +1983,15 @@ btnShare.addEventListener('click', async () => {
                 const isSingleSelected = selected.length == 1;
                 const isMultiSelected = selected.length > 1;
                 if (isNoneSelected)
-                    url = await getZipDownloadUrl([activeConnection.path], activeConnection.path);
+                    url = await getZipDownloadUrl([activeConnection.credentials.path], activeConnection.credentials.path);
                 else if (isSingleSelected) {
                     const el = selected[0];
                     if (el.dataset.type == 'd')
-                        url = await getZipDownloadUrl([el.dataset.path], activeConnection.path);
+                        url = await getZipDownloadUrl([el.dataset.path], activeConnection.credentials.path);
                     else
                         url = await getFileDownloadUrl(el.dataset.path);
                 } else if (isMultiSelected)
-                    url = await getZipDownloadUrl(selected.map(el => el.dataset.path), activeConnection.path);
+                    url = await getZipDownloadUrl(selected.map(el => el.dataset.path), activeConnection.credentials.path);
                 if (url) {
                     navigator.clipboard.writeText(url);
                     setStatus(`Copied download link to clipboard`);
@@ -2110,11 +2110,11 @@ inputSearch.addEventListener('keydown', e => {
 btnSearchGo.addEventListener('click', () => {
     const value = inputSearch.value.trim();
     if (value)
-        searchDirectory(activeConnection.path, inputSearch.value);
+        searchDirectory(activeConnection.credentials.path, inputSearch.value);
 });
 
 btnSearchCancel.addEventListener('click', () => {
-    if (isSearching) changePath(activeConnection.path);
+    if (isSearching) changePath(activeConnection.credentials.path);
 });
 
 window.addEventListener('click', e => {
