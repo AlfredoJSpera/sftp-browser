@@ -54,12 +54,14 @@ if (Object.keys(connections).length === 0) {
 
 The name could be `sessionManager`.
 
-- **KEY** *(string)* - The hash of the SFTP connection options. These options are: 
-    - The host;
-    - The port;
-    - The username;
-    - The password (can be undefined);
-    - The SSH key (can be undefined);
+- **KEY** *(string)* - Could be two things: 
+    - The hash of the SFTP connection options. These options are: 
+        - The host;
+        - The port;
+        - The username;
+        - The password (can be undefined);
+        - The SSH key (can be undefined);
+    - A UUID. See the `credentials.id` in value.
 - **VALUE** *(Object)* - A unified object:
     - `credentials` *(Object)* - An object that contains the credentials: 
         - `id` *(UUID)* - A secondary key with a random UUID. Should be used for the creation/retrival process for credentials.
