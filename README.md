@@ -77,6 +77,52 @@ The name could be `sessionManager`.
     - `session` *(sftp)* - The SFTP connection object that enables the browser to work.
     - `lastActivity` *(number)* - The timestamp in milliseconds of the last recorded activity of the session.
 
+```mermaid
+classDiagram
+    class Credentials {
+        - name: string
+        - host: string
+        - port: number
+        - username: string
+        - path: string
+        - password: string | undefined
+        - privateKey: string | undefined
+        + constructor(name, host, port, username, path, password, privateKey)
+        + getHash() string
+    }
+
+    class SftpConnection {
+        - key: string
+        - credentials: Credentials
+        - credentialsHash: string
+        - credentialsCreationTime: number
+        - session: sftp
+        - lastSessionActivity: number
+        + constructor(key)
+        + setCredentials(credentials: Credentials)
+        + setSession(session: sftp)
+        + updateLastSessionActivity()
+        + closeSession()
+    }
+
+    class SftpConnectionManager {
+        - connections: Map<string, SftpConnection>
+        + constructor()
+        + addNewConnection(key: string, credentials: Credentials) SftpConnection
+        + setConnectionSession(key: string, session: sftp)
+        + getConnection(key: string) SftpConnection | undefined
+        + getConnectionByCredentials(host: string, port: number, username: string, password: string, sshKey: string) SftpConnection | undefined
+        + removeConnection(key: string) boolean
+        + getAllConnections() SftpConnection[]
+        + getAllCredentials() Object
+        + getAllSessions() Object
+    }
+
+    Credentials <|-- SftpConnection : uses
+    SftpConnectionManager "1" *-- "many" SftpConnection : manages
+
+```
+
 
 ## Flow
 
