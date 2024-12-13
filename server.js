@@ -666,6 +666,14 @@ srv.ws('/api/sftp/directories/search', async (ws, wsReq) => {
 		privateKey
 	);
 
+	if (!connection) {
+		ws.send(JSON.stringify({
+			success: false,
+			error: 'Connection not found'
+		}));
+		return ws.close();
+	}
+
 	// Update the session activity periodically to keep the session active
 	const updateActivity = () => {
 		connection.updateLastSessionActivity();
@@ -678,7 +686,7 @@ srv.ws('/api/sftp/directories/search', async (ws, wsReq) => {
 	let isClosed = false;
 	ws.on('close', () => {
 		console.log(`Directory search websocket closed`);
-		session.end();
+		connection.closeSession();
 		clearInterval(interval);
 		delete OLD_sessionActivity[sessionHash];
 		isClosed = true;
@@ -913,6 +921,14 @@ srv.ws('/api/sftp/files/append', async (ws, wsReq) => {
 		privateKey
 	);
 
+	if (!connection) {
+		ws.send(JSON.stringify({
+			success: false,
+			error: 'Connection not found'
+		}));
+		return ws.close();
+	}
+
 	// Handle websocket closure
 	ws.on('close', () => {
 		connection.closeSession();
@@ -1122,7 +1138,7 @@ const downloadSingleFileHandler = async (connectionOpts, res, remotePath, stats)
 		/** When the response closes, ends the session */
 		const handleClose = () => {
 			clearInterval(interval);
-			session.end();
+			connection.closeSession();
 		};
 
 		// On response close, end the session
