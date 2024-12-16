@@ -39,7 +39,7 @@ class Credentials {
 	 */
 	constructor(name, host, port, username, path, password, privateKey) {
 		if (!password && !privateKey) {
-			throw new Error("Authentication method not provided. Specify 'password' or 'key'.");
+			throw new Error("Authentication method not provided. Specify 'password' or 'privateKey'.");
 		}
 
 		if (password && privateKey) {
@@ -341,19 +341,10 @@ const normalizeRemotePath = (remotePath) => {
 	return joined;
 };
 
+/**
+ * Container for all active connections and credentials.
+ */
 const sftpConnections = new SftpConnectionManager();
-
-
-/** Maps session hashes to SFTP session objects. */
-const OLD_sessions = {};
-/** Maps session hashes to the last activity timestamp. */
-const OLD_sessionActivity = {};
-
-/** Holds the credentials for SFTP connections, has an UUID as an ID. */
-const OLD_credentials = {};
-/** Maps session hashes to credentials. */
-const OLD_sessionCredentials = {};
-
 
 /**
  * Manages SFTP sessions, either reusing existing ones or creating new ones.
@@ -376,7 +367,7 @@ const getSession = async (res, sftpConnectionOptions) => {
 	if (connection && connection.session) {
 		// There is already an active session for the connection
 		console.log(`Using existing connection to ${address}`);
-		connection.updateLastActivity();
+		connection.updateLastSessionActivity();
 		return connection.session;
 	}
 
@@ -544,8 +535,15 @@ srv.post('/api/sftp/credentials/create', rawBodyParser, async (req, res) => {
 			data.privateKey
 		);
 
-		const connection = sftpConnections.addNewConnection(credentials.getHash(), credentials);
-		res.json({ success: true, credentials: credentials, key: connection.key });
+		const found = sftpConnections.getConnectionByCredentials(data.host, data.port, data.username, data.password, data.privateKey);
+
+		if (found) {
+			res.json({ success: true, credentials: credentials, key: found.key });
+		} else {
+			const connection = sftpConnections.addNewConnection(credentials.getHash(), credentials);
+			res.json({ success: true, credentials: credentials, key: connection.key });
+		}
+		
 	} catch (error) {
 		res.status(400).json({ success: false, error: error.message });
 	}
@@ -688,7 +686,6 @@ srv.ws('/api/sftp/directories/search', async (ws, wsReq) => {
 		console.log(`Directory search websocket closed`);
 		connection.closeSession();
 		clearInterval(interval);
-		delete OLD_sessionActivity[sessionHash];
 		isClosed = true;
 	});
 
