@@ -9,10 +9,8 @@ let apiHost = window.localStorage.getItem('apiHost') || window.location.host;
 let isLocalhost = window.location.hostname == 'localhost';
 let httpProtocol = isLocalhost ? 'http' : 'https';
 let wsProtocol = httpProtocol == 'http' ? 'ws' : 'wss';
-/** The current active connection */
+/** The `credentials` and the `key` for the current active connection */
 let activeConnection = null;
-/** The ID of the current active connection */
-let activeConnectionId = null;
 
 /**
  * Checks if two HTML elements overlap
@@ -212,16 +210,18 @@ const getHeaders = () => {
     const username = activeConnection.credentials.username;
     const password = activeConnection.credentials.password;
     const privateKey = activeConnection.credentials.privateKey;
+    const connectionKey = activeConnection.key;
     
     const headers = {
         'sftp-host': host,
         'sftp-port': port,
-        'sftp-username': username
+        'sftp-username': username,
+        'sftp-connection-key': connectionKey
     };
     if (password)
         headers['sftp-password'] = encodeURIComponent(password);
     if (privateKey)
-        headers['sftp-key'] = encodeURIComponent(privateKey);
+        headers['sftp-private-key'] = encodeURIComponent(privateKey);
     return headers;
 }
 

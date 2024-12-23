@@ -93,13 +93,14 @@ let isSearching = false;
 
 /**
  * Finds a connection by an ID. If not found, throws an error.
- * @param {number} id The connection ID
+ * @param {number} key The connection ID
+ * @returns {object} The connection object composed of `key` and `credentials`
  */
-const getConnectionById = async (id) => {
-    const apiResponse = await fetch(`/api/sftp/credentials/${id}`);
+const getConnectionByKey = async (key) => {
+    const apiResponse = await fetch(`/api/sftp/credentials/${key}`);
     
     if (!apiResponse.ok) {
-        throw new Error(`Failed to get connection with ID ${id}`);
+        throw new Error(`Failed to get connection with ID ${key}`);
     }
 
     return await apiResponse.json();
@@ -107,23 +108,27 @@ const getConnectionById = async (id) => {
 
 /**
  * Sets the active connection to the one with the specified ID.
- * @param {number} id The connection ID
+ * 
+ * @param {string} key The connection ID
+ * @param {object} credentials The connection credentials
  * @param {string} path An initial directory path to override the saved one
  */
-const setActiveConnection = async (connection, path) => {
-    console.log("Setting active connection", connection.id);
+const setActiveConnection = async (key, credentials, path) => {
+    console.log("Setting active connection", key);
 
     backPaths = [];
     forwardPaths = [];
     
     try {
-        activeConnection = JSON.parse(JSON.stringify(connection));
+        activeConnection = { 
+            key: key, 
+            credentials: credentials 
+        };
     } catch (error) {
         return setStatus(`Error: Failed to set active connection due to unrecognized JSON`, true);
     }
-    console.log("Active connection", activeConnection);
+    console.log("Active connection:", activeConnection);
 
-    activeConnectionId = connection.key;
     selectionClipboard = [];
     changePath(path, false);
 }
@@ -175,7 +180,7 @@ const changePath = async (path, pushState = true) => {
             activeConnection.credentials.path = dataStats.path;
             // Update display
             document.title = `${activeConnection.credentials.name} - ${activeConnection.credentials.path}`;
-            window.history.replaceState(null, null, `?connection=${activeConnectionId}&path=${encodeURIComponent(activeConnection.credentials.path)}`);
+            window.history.replaceState(null, null, `?connection=${activeConnection.key}&path=${encodeURIComponent(activeConnection.credentials.path)}`);
             // Load the directory
             await loadDirectory(dataStats.path);
             // Otherwise, show an error
@@ -782,7 +787,7 @@ const toggleHiddenFileVisibility = () => {
  * @param {string} path The file path.
  */
 const openFileViewer = path => {
-    const url = `/file.html?connection=${activeConnectionId}&path=${encodeURIComponent(path)}`;
+    const url = `/file.html?connection=${activeConnection.key}&path=${encodeURIComponent(path)}`;
     const isStandalone =
         window.matchMedia('(display-mode: standalone)').matches
         || window.matchMedia('(display-mode: minimal-ui)').matches;
@@ -2220,9 +2225,9 @@ window.addEventListener('load', async () => {
     console.log(`Params passed (connection = ${connectionId}, path = ${path})`);
     
     try {
-        const connection = await getConnectionById(connectionId);    
+        const connection = await getConnectionByKey(connectionId);    
         console.log(`Connection found with ${connectionId}:`, connection)
-        setActiveConnection(connection, path);
+        setActiveConnection(connection.key, connection.credentials, path);
     } catch (error) {
         return setStatus(`Error: Cannot find connection with id ${connectionId}`, true);
     }

@@ -27,6 +27,9 @@ const getObjectHash = (obj) => {
 	return hash.digest('hex');
 }
 
+/**
+ * Class that represents credentials for a connection.
+ */
 class Credentials {
 	/**
 	 * @param {string} name - The name of the connection (used for display)
@@ -203,7 +206,7 @@ class SftpConnectionManager {
 	 * Adds a new SFTP connection.
 	 * 
 	 * If you need to add an existing connection, use `connections.set(key, connection)`.
-	 * @param {string} key - Can be an UUID or the hash of the connection options
+	 * @param {string} key - The UUID to identify the connection
 	 * @param {Credentials} credentials - The credentials for the SFTP connection
 	 * @returns {SftpConnection} The new connection object
 	 */
@@ -245,30 +248,26 @@ class SftpConnectionManager {
 	}
 
 	/**
-	 * Gets an existing connection by credentials.
+	 * Gets a list of connections by credentials.
 	 * @param {string} host - The hostname of the SFTP server
 	 * @param {number} port - The port number of the SFTP server
 	 * @param {string} username - The username for the SFTP server
 	 * @param {string} password - The password for the SFTP server
-	 * @param {string} sshKey - The private key for the SFTP server
-	 * @returns {SftpConnection | undefined} The connection object or `undefined` if it does not exist
+	 * @param {string} privateKey - The private key for the SFTP server
+	 * @returns {SftpConnection[]} An array of connections with the same credentials
 	 */
-	getConnectionByCredentials(host, port, username, password, sshKey) {
-		// Fancy method, but it's not working
-		// const hash = getObjectHash({ host, port, username, password, sshKey });
-		
+	getConnectionByCredentials(host, port, username, password, privateKey) {
+		const result = [];
 		for (const connection of this.connections.values()) {
-			// connection.credentialsHash === hash
 			if (connection.credentials.host === host && 
 				connection.credentials.port == port && 
 				connection.credentials.username === username &&
-				(connection.credentials.password === password || connection.credentials.privateKey === sshKey)) {
-					return connection;
+				(connection.credentials.password === password || connection.credentials.privateKey === privateKey)) {
+					result.push(connection);
 			}
 		}
 		
-
-		return undefined;
+		return result;
 	}
 
 	/**
@@ -348,23 +347,25 @@ const sftpConnections = new SftpConnectionManager();
 
 /**
  * Manages SFTP sessions, either reusing existing ones or creating new ones.
- * @param {Response} res The response to send to the request if there is an error
+ * @param {Response} res The response to send to the request if there is an error.
  * @param {sftp.ConnectOptions} sftpConnectionOptions The SFTP connection parameters.
+ * @param {string} connectionKey The key of the connection.
+ * @param {boolean} [forceCreation=false] Whether to force the creation of a new session.
  * @returns {Promise<sftp>|null} The SFTP session object, or an error if the connection failed.
  */
-const getSession = async (res, sftpConnectionOptions) => {
+const getSession = async (res, sftpConnectionOptions, connectionKey, forceCreation = false) => {
 	const username = sftpConnectionOptions.username;
 	const host = sftpConnectionOptions.host;
 	const port = sftpConnectionOptions.port;
-	const password = sftpConnectionOptions.password;
-	const privateKey = sftpConnectionOptions.privateKey;
-	
-	const hash = getObjectHash(sftpConnectionOptions);
 	const address = `${username}@${host}:${port}`;
 	
-	let connection = sftpConnections.getConnection(hash);
+	const connection = sftpConnections.getConnection(connectionKey);
 
-	if (connection && connection.session) {
+	if (!connection) {
+		return res ? res.sendError(`Connection not found with key '${connectionKey}' while connecting to ${address}`) : null;
+	}
+
+	if (!forceCreation && connection.session) {
 		// There is already an active session for the connection
 		console.log(`Using existing connection to ${address}`);
 		connection.updateLastSessionActivity();
@@ -374,31 +375,22 @@ const getSession = async (res, sftpConnectionOptions) => {
 	// Create a new session
 	// There should be already a connection with the same credentials,
 	// created with a previous request to `/api/sftp/credentials/create`
-	connection = sftpConnections.getConnectionByCredentials(
-		host, port, username, password, privateKey
-	);
-
-	if (!connection) {
-		return res ? res.sendError(`Connection not found while connecting to ${address}`) : null;
-	}
-	
 	console.log(`Creating new session to ${address}`);
 	const session = new sftp();
 	connection.setSession(session);
 
-	const deletion_function = () => {
-		sftpConnections.removeConnection(hash);
+	const deleteThisConnection = () => {
+		const key = connection.key;
+		sftpConnections.removeConnection(key);
 		console.log(`Session to ${address} closed`);
 	}
 
 	// Handle session events
 	session.on('end', () => {
-		console.log("In end")
-		deletion_function()
+		deleteThisConnection();
 	});
 	session.on('close', () => {
-		console.log("In close")
-		deletion_function()
+		deleteThisConnection();
 	});
 
 	try {
@@ -407,7 +399,7 @@ const getSession = async (res, sftpConnectionOptions) => {
 		connection.updateLastSessionActivity();
 		console.log(`Connected to ${address}`);
 	} catch (error) {
-		deletion_function();
+		deleteThisConnection();
 		console.log(`Connection to ${address} failed`);
 		return res ? res.sendError(error) : null;
 	}
@@ -456,6 +448,7 @@ const initApi = asyncHandler(async (req, res, next) => {
 	};
 
 	// Get the connection options from the request headers
+	// These are set in main.js in getHeaders()
 	req.connectionOpts = {
 		host: req.headers['sftp-host'],
 		port: req.headers['sftp-port'] || 22,
@@ -463,10 +456,15 @@ const initApi = asyncHandler(async (req, res, next) => {
 
 		// Decode the password and private key from URI encoding
 		password: decodeURIComponent(req.headers['sftp-password'] || '') || undefined,
-		privateKey: decodeURIComponent(req.headers['sftp-key'] || '') || undefined,
+		privateKey: decodeURIComponent(req.headers['sftp-private-key'] || '') || undefined,
 	};
 
+	req.connectionKey = req.headers['sftp-connection-key'];
+
 	// Validate the connection options
+	if (!req.connectionKey) {
+		return res.sendError('Missing connection key');
+	}
 	if (!req.connectionOpts.host) {
 		return res.sendError('Missing host header');
 	}
@@ -478,7 +476,7 @@ const initApi = asyncHandler(async (req, res, next) => {
 	}
 
 	// Get the SFTP session
-	req.session = await getSession(res, req.connectionOpts);
+	req.session = await getSession(res, req.connectionOpts, req.connectionKey);
 
 	if (!req.session) {
 		// If the session could not be created, 
@@ -493,22 +491,25 @@ const initApi = asyncHandler(async (req, res, next) => {
 //~~~~~~~~~~~MY API~~~~~~~~~~~//
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 
+// Get the number of credentials present in the server
 srv.get('/api/sftp/credentials', async (req, res) => {
 	const length = Object.keys(sftpConnections.getAllCredentials()).length;
-	res.json({ success: true, lenght: length });
+	res.json({ success: true, numOfCredentials: length });
 });
 
+// Get the number of sessions present in the server
 srv.get('/api/sftp/sessions', async (req, res) => {
 	const length = Object.keys(sftpConnections.getAllSessions()).length;
-	res.json({ success: true, lenght: length });
+	res.json({ success: true, numOfSessions: length });
 });
 
-srv.get('/api/sftp/credentials/:id', async (req, res) => {
-	const id = req.params.id;
-	const connection = sftpConnections.getConnection(id);
+// Get the credentials of a specific connection
+srv.get('/api/sftp/credentials/:key', async (req, res) => {
+	const key = req.params.key;
+	const connection = sftpConnections.getConnection(key);
 
 	if (connection) {
-		res.json({ success: true, credentials: connection.credentials, key: connection.key });
+		res.json({ success: true, key: connection.key, credentials: connection.credentials });
 	} else {
 		res.status(404).json("Not found");
 	}
@@ -521,7 +522,7 @@ srv.post('/api/sftp/credentials/create', rawBodyParser, async (req, res) => {
 		data = JSON.parse(req.body);
 	} catch (error) {
 		console.log(error);
-		res.status(400).json({ success: false, error: "JSON parse error" });
+		res.status(500).json({ success: false, error: "Server JSON parse error" });
 	}
 
 	try {
@@ -535,27 +536,22 @@ srv.post('/api/sftp/credentials/create', rawBodyParser, async (req, res) => {
 			data.privateKey
 		);
 
-		const found = sftpConnections.getConnectionByCredentials(data.host, data.port, data.username, data.password, data.privateKey);
-
-		if (found) {
-			res.json({ success: true, credentials: credentials, key: found.key });
-		} else {
-			const connection = sftpConnections.addNewConnection(credentials.getHash(), credentials);
-			res.json({ success: true, credentials: credentials, key: connection.key });
-		}
-		
+		const key = crypto.randomUUID();
+		const connection = sftpConnections.addNewConnection(key, credentials);
+		// TODO: Remove the credentials from the JSON
+		res.json({ success: true, key: connection.key, credentials: credentials });
 	} catch (error) {
 		res.status(400).json({ success: false, error: error.message });
 	}
 })
 
-srv.get('/api/sftp/credentials/delete/:id', async (req, res) => {
-	const id = req.params.id;
+srv.get('/api/sftp/credentials/delete/:key', async (req, res) => {
+	const key = req.params.key;
 
-	if (sftpConnections.removeConnection(id)) {
-		res.json({ success: true, deleted: id });
+	if (sftpConnections.removeConnection(key)) {
+		res.json({ success: true, deleted: key });
 	} else {
-		res.status(404).json({ success: false, error: `Object '${id}' not found` });
+		res.status(404).json({ success: false, error: `Object '${key}' not found` });
 	}
 });
 
@@ -615,12 +611,8 @@ srv.ws('/api/sftp/directories/search', async (ws, wsReq) => {
 		return ws.close();
 	}
 
-	// Add uniqueness to the connection opts
-	// This forces a new connection to be created
-	req.connectionOpts.ts = Date.now();
-
 	// Create the session and throw an error if it fails
-	const session = await getSession(null, req.connectionOpts);
+	const session = await getSession(null, req.connectionOpts, req.connectionKey, true);
 
 	if (!session) {
 		ws.send(JSON.stringify({
@@ -653,16 +645,10 @@ srv.ws('/api/sftp/directories/search', async (ws, wsReq) => {
 	const host = req.connectionOpts.host;
 	const port = req.connectionOpts.port;
 	const username = req.connectionOpts.username;
-	const password = req.connectionOpts.password;
-	const privateKey = req.connectionOpts.privateKey;
+	
+	const address = `${username}@${host}:${port}`;
 
-	const connection = sftpConnections.getConnectionByCredentials(
-		host,
-		port,
-		username,
-		password,
-		privateKey
-	);
+	const connection = sftpConnections.getConnection(req.connectionKey);
 
 	if (!connection) {
 		ws.send(JSON.stringify({
@@ -690,7 +676,7 @@ srv.ws('/api/sftp/directories/search', async (ws, wsReq) => {
 	});
 
 	// Listen for messages
-	console.log(`Websocket opened to search directory ${username}@${host}:${port}$${filePath}`);
+	console.log(`Websocket opened to search directory ${address}$${filePath}`);
 
 	/** Function to get a directory listing */
 	const scanDir = async (dirPath) => {
@@ -879,12 +865,8 @@ srv.ws('/api/sftp/files/append', async (ws, wsReq) => {
 		return ws.close();
 	}
 
-	// Add uniqueness to the connection opts
-	// This forces a new connection to be created
-	req.connectionOpts.ts = Date.now();
-
 	// Create the session and throw an error if it fails
-	const session = await getSession(null, req.connectionOpts);
+	const session = await getSession(null, req.connectionOpts, req.connectionKey, true);
 
 	if (!session) {
 		ws.send(JSON.stringify({
@@ -907,16 +889,10 @@ srv.ws('/api/sftp/files/append', async (ws, wsReq) => {
 	const host = req.connectionOpts.host;
 	const port = req.connectionOpts.port;
 	const username = req.connectionOpts.username;
-	const password = req.connectionOpts.password;
-	const privateKey = req.connectionOpts.privateKey;
+	
+	const address = `${username}@${host}:${port}`;
 
-	const connection = sftpConnections.getConnectionByCredentials(
-		host,
-		port,
-		username,
-		password,
-		privateKey
-	);
+	const connection = sftpConnections.getConnection(req.connectionKey);
 
 	if (!connection) {
 		ws.send(JSON.stringify({
@@ -933,7 +909,7 @@ srv.ws('/api/sftp/files/append', async (ws, wsReq) => {
 	});
 
 	// Listen for messages
-	console.log(`Websocket opened to append to ${username}@${host}:${port}$${filePath}`);
+	console.log(`Websocket opened to append to ${address}$${filePath}`);
 
 	let isWriting = false;
 	ws.on('message', async (data) => {
@@ -1081,33 +1057,24 @@ srv.get('/api/sftp/files/stat', initApi, async (req, res) => {
  * Handles the download of a single file from a remote SFTP server.
  *
  * @param {Object} connectionOpts - The connection options for the SFTP server.
- * @param {string} connectionOpts.host - The hostname of the SFTP server.
- * @param {number} connectionOpts.port - The port number of the SFTP server.
- * @param {string} connectionOpts.username - The username for the SFTP server.
- * @param {string} connectionOpts.password - The password for the SFTP server.
+ * @param {string} connectionKey - The key of the connection.
  * @param {Object} res - The HTTP response object.
  * @param {string} remotePath - The remote file path on the SFTP server.
  * @param {Object} stats - The file statistics object.
- * @param {boolean} stats.isFile - Indicates if the remote path is a file.
- * @param {number} stats.size - The size of the file in bytes.
- *
+ * 
  * @throws {Error} If the remote path is not a file.
  * @throws {Error} If the session creation fails.
  */
-const downloadSingleFileHandler = async (connectionOpts, res, remotePath, stats) => {
+const downloadSingleFileHandler = async (connectionOpts, connectionKey, res, remotePath, stats) => {
 	let interval;
 
 	try {
 		if (!stats.isFile) {
-			throw new Error('Not a file');
+			throw new Error(`Not a file: ${remotePath}`);
 		}
 
-		// Add uniqueness to the connection opts
-		// This forces a new connection to be created
-		connectionOpts.ts = Date.now();
-
-		// Create the session and throw an error if it fails
-		const session = await getSession(res, connectionOpts);
+		// Force the creation of the session and throw an error if it fails
+		const session = await getSession(res, connectionOpts, connectionKey, true);
 
 		if (!session) {
 			throw new Error('Failed to create session');
@@ -1116,16 +1083,9 @@ const downloadSingleFileHandler = async (connectionOpts, res, remotePath, stats)
 		const host = connectionOpts.host;
 		const port = connectionOpts.port;
 		const username = connectionOpts.username;
-		const password = connectionOpts.password;
-		const privateKey = connectionOpts.privateKey;
+		const address = `${username}@${host}:${port}`;
 
-		const connection = sftpConnections.getConnectionByCredentials(
-			host,
-			port,
-			username,
-			password,
-			privateKey
-		);
+		const connection = sftpConnections.getConnection(connectionKey);
 
 		// Continuously update the session activity
 		interval = setInterval(() => {
@@ -1149,7 +1109,7 @@ const downloadSingleFileHandler = async (connectionOpts, res, remotePath, stats)
 		res.setHeader('Content-Length', stats.size);
 
 		// Start the download
-		console.log(`Starting download: ${username}@${host}:${port} ${remotePath}`);
+		console.log(`Starting download: ${address} ${remotePath}`);
 		await session.get(remotePath, res);
 
 		// Force-end the response
@@ -1165,26 +1125,19 @@ const downloadSingleFileHandler = async (connectionOpts, res, remotePath, stats)
  * Handles the downloading of multiple files from a remote server, compressing them into a zip archive.
  *
  * @param {Object} connectionOpts - The connection options for the remote server.
- * @param {string} connectionOpts.host - The hostname of the SFTP server.
- * @param {number} connectionOpts.port - The port number of the SFTP server.
- * @param {string} connectionOpts.username - The username for the SFTP server.
- * @param {string} connectionOpts.password - The password for the SFTP server.
+ * @param {string} connectionKey - The key of the connection.
  * @param {Object} res - The HTTP response object.
  * @param {string[]} remotePaths - An array of remote file paths to download.
  * @param {string} [rootPath='/'] - The root path to use for normalization.
  * @returns {Promise<void>} - A promise that resolves when the operation is complete.
  */
-const downloadMultiFileHandler = async (connectionOpts, res, remotePaths, rootPath = '/') => {
+const downloadMultiFileHandler = async (connectionOpts, connectionKey, res, remotePaths, rootPath = '/') => {
 	rootPath = normalizeRemotePath(rootPath);
 	let interval;
 
 	try {
-		// Add uniqueness to the connection opts
-		// This forces a new connection to be created
-		connectionOpts.ts = Date.now();
-
 		// Create the session and throw an error if it fails
-		const session = await getSession(res, connectionOpts);
+		const session = await getSession(res, connectionOpts, connectionKey, true);
 
 		if (!session) {
 			throw new Error('Failed to create session');
@@ -1193,16 +1146,9 @@ const downloadMultiFileHandler = async (connectionOpts, res, remotePaths, rootPa
 		const host = connectionOpts.host;
 		const port = connectionOpts.port;
 		const username = connectionOpts.username;
-		const password = connectionOpts.password;
-		const privateKey = connectionOpts.privateKey;
+		const address = `${username}@${host}:${port}`;
 
-		const connection = sftpConnections.getConnectionByCredentials(
-			host,
-			port,
-			username,
-			password,
-			privateKey
-		);
+		const connection = sftpConnections.getConnection(connectionKey);
 
 		// Continuously update the session activity
 		setInterval(() => {
@@ -1238,7 +1184,7 @@ const downloadMultiFileHandler = async (connectionOpts, res, remotePaths, rootPa
 		/** Adds a file to the zip archive */
 		const addToArchive = async (remotePath) => {
 			const archivePath = normalizeRemotePath(remotePath.replace(rootPath, ''));
-			console.log(`Zipping: ${username}@${host}:${port} ${remotePath}`);
+			console.log(`Zipping: ${address} ${remotePath}`);
 
 			// Get file read stream
 			const stream = session.createReadStream(remotePath);
@@ -1308,7 +1254,7 @@ srv.get('/api/sftp/files/get/single', initApi, async (req, res) => {
 	try {
 		// Get the file metadata and download it
 		const stats = await session.stat(remotePath);
-		await downloadSingleFileHandler(req.connectionOpts, res, remotePath, stats);
+		await downloadSingleFileHandler(req.connectionOpts, req.connectionKey, res, remotePath, stats);
 	} catch (error) {
 		res.status(400).end();
 	}
@@ -1346,7 +1292,7 @@ srv.get('/api/sftp/files/get/single/url', initApi, async (req, res) => {
 		created: Date.now(),
 		paths: [res.data.path],
 		handler: async (req2, res2) => {
-			await downloadSingleFileHandler(req.connectionOpts, res2, res.data.path, stats);
+			await downloadSingleFileHandler(req.connectionOpts, req.connectionKey, res2, res.data.path, stats);
 		}
 	}
 	res.sendData();
@@ -1375,7 +1321,7 @@ srv.get('/api/sftp/files/get/multi/url', initApi, async (req, res) => {
 		paths: res.data.paths,
 		isZip: true,
 		handler: async (req2, res2) => {
-			await downloadMultiFileHandler(req.connectionOpts, res2, res.data.paths, req.query.rootPath);
+			await downloadMultiFileHandler(req.connectionOpts, req.connectionKey, res2, res.data.paths, req.query.rootPath);
 		}
 	}
 	console.log("[Multi url] Created download handler")
@@ -1431,16 +1377,18 @@ setInterval(() => {
 
 	// Inactive sessions
 	for (const connection of sftpConnections.getAllConnections()) {
-		const hash = connection.key;
+		const key = connection.key;
 		const lastActive = connection.lastSessionActivity;
 		const credentialsCreation = connection.credentialsCreationTime;
-		const timePassedSinceLastActive = Date.now() - lastActive;
-		const timePassedSinceCredentialsCreation = Date.now() - credentialsCreation;
+		const now = Date.now();
+		const timePassedSinceLastActive = now - lastActive;
+		const timePassedSinceCredentialsCreation = now - credentialsCreation;
 
 		if (!lastActive) {
+			// If the session was never active, check the credentials creation time
 			if (timePassedSinceCredentialsCreation > maxTimePassed) {
-				console.log(`Deleting inactive credentials ${connection.key}`);
-				sftpConnections.removeConnection(connection.key);
+				console.log(`Deleting inactive connection with only credentials '${key}'`);
+				sftpConnections.removeConnection(key);
 			}
 			continue;
 		}
@@ -1451,7 +1399,7 @@ setInterval(() => {
 		// console.log(`[connection deletion] tolerance: ${max_time_passed/1000}s`)
 		
 		if (timePassedSinceLastActive > maxTimePassed) {
-			console.log(`Deleting inactive sftp session ${hash}`);
+			console.log(`Deleting inactive connection '${key}'`);
 			sftpConnections.removeConnection(connection.key);
 		}
 	}
