@@ -7,7 +7,7 @@ const isElectron = window && window.process && window.process.type;
  */
 let apiHost = window.localStorage.getItem('apiHost') || window.location.host;
 let isLocalhost = window.location.hostname == 'localhost';
-let httpProtocol = isLocalhost ? 'http' : 'https';
+let httpProtocol = 'http' //isLocalhost ? 'http' : 'https';
 let wsProtocol = httpProtocol == 'http' ? 'ws' : 'wss';
 /** The `credentials` and the `key` for the current active connection */
 let activeConnection = null;
