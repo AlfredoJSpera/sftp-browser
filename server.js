@@ -538,8 +538,7 @@ srv.post('/api/sftp/credentials/create', rawBodyParser, async (req, res) => {
 
 		const key = crypto.randomUUID();
 		const connection = sftpConnections.addNewConnection(key, credentials);
-		// TODO: Remove the credentials from the JSON
-		res.json({ success: true, key: connection.key, credentials: credentials });
+		res.json({ success: true, connection_uuid: connection.key });
 	} catch (error) {
 		res.status(400).json({ success: false, error: error.message });
 	}
